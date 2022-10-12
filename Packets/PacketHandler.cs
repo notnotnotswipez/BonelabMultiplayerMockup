@@ -13,20 +13,20 @@ namespace BonelabMultiplayerMockup.Packets
 
         public static void RegisterPackets()
         {
-            MessageReaders.Add(NetworkMessageType.PlayerUpdateMessage, new PlayerBonePacket());
-            MessageReaders.Add(NetworkMessageType.ShortIdUpdateMessage, new ShortIdPacket());
-            MessageReaders.Add(NetworkMessageType.InitializeSyncMessage, new InitializeSyncPacket());
-            MessageReaders.Add(NetworkMessageType.TransformUpdateMessage, new TransformUpdatePacket());
-            MessageReaders.Add(NetworkMessageType.OwnerChangeMessage, new OwnerChangePacket());
-            MessageReaders.Add(NetworkMessageType.DisconnectMessage, new DisconnectPacket());
-            MessageReaders.Add(NetworkMessageType.RequestIdsMessage, new RequestIdsPacket());
-            MessageReaders.Add(NetworkMessageType.IdCatchupMessage, new JoinCatchupPacket());
-            MessageReaders.Add(NetworkMessageType.AvatarChangeMessage, new AvatarChangePacket());
-            MessageReaders.Add(NetworkMessageType.GunStateMessage, new GunStatePacket());
-            MessageReaders.Add(NetworkMessageType.MagInsertMessage, new MagInsertMessage());
-            MessageReaders.Add(NetworkMessageType.GroupDestroyMessage, new GroupDestroyPacket());
-            MessageReaders.Add(NetworkMessageType.AvatarQuestionMessage, new AvatarQuestionPacket());
-            MessageReaders.Add(NetworkMessageType.SyncResetMessage, new SyncResetPacket());
+            MessageReaders.Add(NetworkMessageType.PlayerUpdatePacket, new PlayerBonePacket());
+            MessageReaders.Add(NetworkMessageType.ShortIdUpdatePacket, new ShortIdPacket());
+            MessageReaders.Add(NetworkMessageType.InitializeSyncPacket, new InitializeSyncPacket());
+            MessageReaders.Add(NetworkMessageType.TransformUpdatePacket, new TransformUpdatePacket());
+            MessageReaders.Add(NetworkMessageType.OwnerChangePacket, new OwnerChangePacket());
+            MessageReaders.Add(NetworkMessageType.DisconnectPacket, new DisconnectPacket());
+            MessageReaders.Add(NetworkMessageType.RequestIdsPacket, new RequestIdsPacket());
+            MessageReaders.Add(NetworkMessageType.IdCatchupPacket, new JoinCatchupPacket());
+            MessageReaders.Add(NetworkMessageType.AvatarChangePacket, new AvatarChangePacket());
+            MessageReaders.Add(NetworkMessageType.GunStatePacket, new GunStatePacket());
+            MessageReaders.Add(NetworkMessageType.MagInsertPacket, new MagInsertPacket());
+            MessageReaders.Add(NetworkMessageType.GroupDestroyPacket, new GroupDestroyPacket());
+            MessageReaders.Add(NetworkMessageType.AvatarQuestionPacket, new AvatarQuestionPacket());
+            MessageReaders.Add(NetworkMessageType.SyncResetPacket, new SyncResetPacket());
         }
 
         public static void ReadMessage(NetworkMessageType messageType, PacketByteBuf packetByteBuf, long sender)

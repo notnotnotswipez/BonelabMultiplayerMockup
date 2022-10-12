@@ -43,7 +43,7 @@ namespace BonelabMultiplayerMockup.Packets.Player
                     userId = DiscordIntegration.currentUser.Id
                 };
                 var shortBuf =
-                    PacketHandler.CompressMessage(NetworkMessageType.RequestIdsMessage, requestIdsMessageData);
+                    PacketHandler.CompressMessage(NetworkMessageType.RequestIdsPacket, requestIdsMessageData);
                 Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, shortBuf.getBytes());
             }
         }

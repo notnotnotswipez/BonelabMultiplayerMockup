@@ -209,7 +209,7 @@ namespace BonelabMultiplayerMockup.Object
                 };
 
                 var packetByteBuf =
-                    PacketHandler.CompressMessage(NetworkMessageType.TransformUpdateMessage, transformUpdateData);
+                    PacketHandler.CompressMessage(NetworkMessageType.TransformUpdatePacket, transformUpdateData);
                 Node.activeNode.BroadcastMessage((byte)NetworkChannel.Unreliable, packetByteBuf.getBytes());
             }
 
@@ -230,7 +230,7 @@ namespace BonelabMultiplayerMockup.Object
                     userId = currentUserId,
                     objectId = currentId
                 };
-                var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.OwnerChangeMessage,
+                var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.OwnerChangePacket,
                     ownerQueueChangeData);
                 Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, packetByteBuf.getBytes());
                 DebugLogger.Msg("Transferring ownership of whole group ID: " + groupId);
@@ -269,7 +269,7 @@ namespace BonelabMultiplayerMockup.Object
                 userId = userId,
                 objectId = currentId
             };
-            var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.OwnerChangeMessage,
+            var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.OwnerChangePacket,
                 ownerQueueChangeData);
             Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, packetByteBuf.getBytes());
 
@@ -433,7 +433,7 @@ namespace BonelabMultiplayerMockup.Object
                 };
 
                 var packetByteBuf =
-                    PacketHandler.CompressMessage(NetworkMessageType.InitializeSyncMessage, initializeSyncData);
+                    PacketHandler.CompressMessage(NetworkMessageType.InitializeSyncPacket, initializeSyncData);
 
                 Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, packetByteBuf.getBytes());
                 DebugLogger.Msg("Starting Id: " + startingId);

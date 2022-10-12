@@ -2,20 +2,20 @@ namespace BonelabMultiplayerMockup.Packets
 {
     public enum NetworkMessageType : byte
     {
-        PlayerUpdateMessage = 0,
-        ShortIdUpdateMessage = 1,
-        TransformUpdateMessage = 2,
-        InitializeSyncMessage = 3,
-        OwnerChangeMessage = 4,
-        DisconnectMessage = 5,
-        RequestIdsMessage = 6,
-        IdCatchupMessage = 7,
-        SpawnGunMessage = 8,
-        AvatarChangeMessage = 9,
-        GunStateMessage = 10,
-        MagInsertMessage = 11,
-        GroupDestroyMessage = 12,
-        AvatarQuestionMessage = 13,
-        SyncResetMessage = 14
+        PlayerUpdatePacket = 0,
+        ShortIdUpdatePacket = 1,
+        TransformUpdatePacket = 2,
+        InitializeSyncPacket = 3,
+        OwnerChangePacket = 4,
+        DisconnectPacket = 5,
+        RequestIdsPacket = 6,
+        IdCatchupPacket = 7,
+        SpawnGunPacket = 8,
+        AvatarChangePacket = 9,
+        GunStatePacket = 10,
+        MagInsertPacket = 11,
+        GroupDestroyPacket = 12,
+        AvatarQuestionPacket = 13,
+        SyncResetPacket = 14
     }
 }

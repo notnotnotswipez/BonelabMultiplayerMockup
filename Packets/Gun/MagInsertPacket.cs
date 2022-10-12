@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace BonelabMultiplayerMockup.Packets.Gun
 {
-    public class MagInsertMessage : NetworkPacket
+    public class MagInsertPacket : NetworkPacket
     {
         public override PacketByteBuf CompressData(MessageData messageData)
         {

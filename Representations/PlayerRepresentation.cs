@@ -36,7 +36,7 @@ namespace BonelabMultiplayerMockup.Representations
             {
                 // yep
             };
-            var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.AvatarQuestionMessage, avatarAskData);
+            var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.AvatarQuestionPacket, avatarAskData);
             Node.activeNode.SendMessage(this.user.Id, (byte)NetworkChannel.Transaction, catchupBuff.getBytes());
         }
 
@@ -58,7 +58,6 @@ namespace BonelabMultiplayerMockup.Representations
                 backupCopy.name = "(PlayerRep) " + username;
                 playerRep = backupCopy;
                 Avatar avatarAgain = backupCopy.GetComponentInChildren<Avatar>();
-                avatarAgain.PrecomputeAvatar();
                 PopulateBoneDictionary(avatarAgain.gameObject.transform);
                 GameObject.DontDestroyOnLoad(backupCopy);
                 return;
@@ -68,7 +67,6 @@ namespace BonelabMultiplayerMockup.Representations
             copy.name = "(PlayerRep) " + username;
             playerRep = copy;
             Avatar avatar = copy.GetComponentInChildren<Avatar>();
-            avatar.PrecomputeAvatar();
             PopulateBoneDictionary(avatar.gameObject.transform);
             GameObject.DontDestroyOnLoad(copy);
         }

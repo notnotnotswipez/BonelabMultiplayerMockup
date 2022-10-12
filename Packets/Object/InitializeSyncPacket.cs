@@ -76,7 +76,7 @@ namespace BonelabMultiplayerMockup.Packets.Object
                                 lastId = SyncedObject.lastId,
                                 lastGroupId = SyncedObject.lastGroupId
                             };
-                            var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.IdCatchupMessage, joinCatchupData);
+                            var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.IdCatchupPacket, joinCatchupData);
                             Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, catchupBuff.getBytes());
                         }
 
@@ -98,7 +98,7 @@ namespace BonelabMultiplayerMockup.Packets.Object
                         lastId = SyncedObject.lastId,
                         lastGroupId = SyncedObject.lastGroupId
                     };
-                    var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.IdCatchupMessage, joinCatchupData);
+                    var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.IdCatchupPacket, joinCatchupData);
                     Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, catchupBuff.getBytes());
                 }
             }

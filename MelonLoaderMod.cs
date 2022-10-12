@@ -97,7 +97,7 @@ namespace BonelabMultiplayerMockup
                                 // empty data
                             };
                             PacketByteBuf packetByteBuf =
-                                PacketHandler.CompressMessage(NetworkMessageType.SyncResetMessage, syncResetData);
+                                PacketHandler.CompressMessage(NetworkMessageType.SyncResetPacket, syncResetData);
                             Node.activeNode.BroadcastMessage((byte)NetworkChannel.Transaction ,packetByteBuf.getBytes());
                         
                             SyncedObject.CleanData(true);
@@ -140,19 +140,10 @@ namespace BonelabMultiplayerMockup
                             // empty data
                         };
                         PacketByteBuf packetByteBuf =
-                            PacketHandler.CompressMessage(NetworkMessageType.SyncResetMessage, syncResetData);
+                            PacketHandler.CompressMessage(NetworkMessageType.SyncResetPacket, syncResetData);
                         Node.activeNode.BroadcastMessage((byte)NetworkChannel.Transaction ,packetByteBuf.getBytes());
                         
                         SyncedObject.CleanData(true);
-                        
-                        if (BoneLib.Player.GetObjectInHand(BoneLib.Player.leftHand) != null)
-                        {
-                            SyncedObject.Sync(BoneLib.Player.GetObjectInHand(BoneLib.Player.leftHand));
-                        }
-                        if (BoneLib.Player.GetObjectInHand(BoneLib.Player.rightHand) != null)
-                        {
-                            SyncedObject.Sync(BoneLib.Player.GetObjectInHand(BoneLib.Player.rightHand));
-                        }
                     }
                 }
             }
@@ -209,7 +200,7 @@ namespace BonelabMultiplayerMockup
                                 backupObjectId = lastId
                             };
 
-                            PacketByteBuf message = PacketHandler.CompressMessage(NetworkMessageType.GroupDestroyMessage, groupDestroyData);
+                            PacketByteBuf message = PacketHandler.CompressMessage(NetworkMessageType.GroupDestroyPacket, groupDestroyData);
                             Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, message.getBytes());
                         }
 
@@ -241,7 +232,7 @@ namespace BonelabMultiplayerMockup
                     transform = simplifiedTransform
                 };
 
-                PacketByteBuf message = PacketHandler.CompressMessage(NetworkMessageType.PlayerUpdateMessage, playerBoneData);
+                PacketByteBuf message = PacketHandler.CompressMessage(NetworkMessageType.PlayerUpdatePacket, playerBoneData);
                 Node.activeNode.BroadcastMessage((byte)NetworkChannel.Unreliable, message.getBytes());
             }
         }

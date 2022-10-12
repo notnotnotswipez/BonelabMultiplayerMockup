@@ -27,7 +27,7 @@ namespace BonelabMultiplayerMockup.Packets.Player
                         byteId = valuePair.Key
                     };
                     var shortBuf =
-                        PacketHandler.CompressMessage(NetworkMessageType.ShortIdUpdateMessage, addMessageData);
+                        PacketHandler.CompressMessage(NetworkMessageType.ShortIdUpdatePacket, addMessageData);
                     Server.instance.SendMessage(userId, (byte)NetworkChannel.Reliable, shortBuf.getBytes());
                 }
         }

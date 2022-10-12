@@ -27,7 +27,7 @@ namespace BonelabMultiplayerMockup.Packets.Player
             };
 
             PacketByteBuf newBuffer =
-                PacketHandler.CompressMessage(NetworkMessageType.AvatarChangeMessage, avatarChangeData);
+                PacketHandler.CompressMessage(NetworkMessageType.AvatarChangePacket, avatarChangeData);
             
             Node.activeNode.SendMessage(userIdToSend, (byte)NetworkChannel.Transaction, newBuffer.getBytes());
         }

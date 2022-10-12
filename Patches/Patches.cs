@@ -39,7 +39,7 @@ namespace BonelabMultiplayerMockup.Patches
                 userId = DiscordIntegration.currentUser.Id,
                 barcode = Player.GetRigManager().GetComponentInChildren<RigManager>()._avatarCrate._barcode._id
             };
-            var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.AvatarChangeMessage,
+            var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.AvatarChangePacket,
                 swapAvatarMessageData);
             Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, packetByteBuf.getBytes());
             BonelabMultiplayerMockup.PopulateCurrentAvatarData();
@@ -156,7 +156,11 @@ namespace BonelabMultiplayerMockup.Patches
                             {
                                 if (foundSpawnGun || isHost)
                                 {
-                                    SyncedObject.Sync(__instance.gameObject);
+                                    var syncedObject = SyncedObject.GetSyncedComponent(__instance.gameObject);
+                                    if (syncedObject == null)
+                                        SyncedObject.Sync(__instance.gameObject);
+                                    else
+                                        syncedObject.BroadcastOwnerChange();
                                     DebugLogger.Msg("Synced NPC: " + __instance.gameObject.name);
                                 }
                             }
@@ -164,7 +168,11 @@ namespace BonelabMultiplayerMockup.Patches
                             {
                                 if (foundSpawnGun)
                                 {
-                                    SyncedObject.Sync(__instance.gameObject);
+                                    var syncedObject = SyncedObject.GetSyncedComponent(__instance.gameObject);
+                                    if (syncedObject == null)
+                                        SyncedObject.Sync(__instance.gameObject);
+                                    else
+                                        syncedObject.BroadcastOwnerChange();
                                     DebugLogger.Msg("Synced spawn gun spawned Object: " + __instance.gameObject.name);
                                 }
                             }
@@ -195,7 +203,7 @@ namespace BonelabMultiplayerMockup.Patches
                             objectid = syncedObject.currentId,
                             state = 0
                         };
-                        var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.GunStateMessage,
+                        var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.GunStatePacket,
                             gunStateMessageData);
                         Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, packetByteBuf.getBytes());
                     }

@@ -41,7 +41,7 @@ namespace BonelabMultiplayerMockup.Nodes
                     byteId = valuePair.Key
                 };
                 var packetByteBuf =
-                    PacketHandler.CompressMessage(NetworkMessageType.ShortIdUpdateMessage, addMessageData);
+                    PacketHandler.CompressMessage(NetworkMessageType.ShortIdUpdatePacket, addMessageData);
                 BroadcastMessage((byte)NetworkChannel.Reliable, packetByteBuf.getBytes());
             }
 
@@ -50,7 +50,7 @@ namespace BonelabMultiplayerMockup.Nodes
                 userId = userId,
                 byteId = DiscordIntegration.RegisterUser(userId)
             };
-            var secondBuff = PacketHandler.CompressMessage(NetworkMessageType.ShortIdUpdateMessage, idMessageData);
+            var secondBuff = PacketHandler.CompressMessage(NetworkMessageType.ShortIdUpdatePacket, idMessageData);
             BroadcastMessage((byte)NetworkChannel.Reliable, secondBuff.getBytes());
 
             var joinCatchupData = new JoinCatchupData
@@ -58,7 +58,7 @@ namespace BonelabMultiplayerMockup.Nodes
                 lastId = SyncedObject.lastId,
                 lastGroupId = SyncedObject.lastGroupId
             };
-            var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.IdCatchupMessage, joinCatchupData);
+            var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.IdCatchupPacket, joinCatchupData);
             SendMessage(userId, (byte)NetworkChannel.Reliable, catchupBuff.getBytes());
 
             
@@ -122,7 +122,7 @@ namespace BonelabMultiplayerMockup.Nodes
                 };
 
                 var packetByteBuf =
-                    PacketHandler.CompressMessage(NetworkMessageType.DisconnectMessage, disconnectMessageData);
+                    PacketHandler.CompressMessage(NetworkMessageType.DisconnectPacket, disconnectMessageData);
 
                 instance.BroadcastMessage((byte)NetworkChannel.Reliable, packetByteBuf.getBytes());
             }
