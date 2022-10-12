@@ -2,12 +2,11 @@ using BonelabMultiplayerMockup.Object;
 using BonelabMultiplayerMockup.Patches;
 using BonelabMultiplayerMockup.Utils;
 using MelonLoader;
-using SLZ.Interaction;
 using UnityEngine;
 
-namespace BonelabMultiplayerMockup.Messages.Handlers.Gun
+namespace BonelabMultiplayerMockup.Packets.Gun
 {
-    public class MagInsertMessage : MessageReader
+    public class MagInsertMessage : NetworkPacket
     {
         public override PacketByteBuf CompressData(MessageData messageData)
         {

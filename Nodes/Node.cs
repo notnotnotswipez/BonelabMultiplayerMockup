@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using BonelabMultiplayerMockup.Messages;
 using BonelabMultiplayerMockup.Object;
+using BonelabMultiplayerMockup.Packets;
 using BonelabMultiplayerMockup.Representations;
 using Discord;
 using MelonLoader;
@@ -48,7 +48,7 @@ namespace BonelabMultiplayerMockup.Nodes
 
             var packetByteBuf = new PacketByteBuf(realData);
 
-            MessageHandler.ReadMessage((NetworkMessageType)messageType, packetByteBuf, userId);
+            PacketHandler.ReadMessage((NetworkMessageType)messageType, packetByteBuf, userId);
         }
 
         public void SendMessage(long userId, byte channel, byte[] data)

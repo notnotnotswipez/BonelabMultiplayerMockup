@@ -1,10 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
-using BonelabMultiplayerMockup.Messages;
-using BonelabMultiplayerMockup.Messages.Handlers.Gun;
-using BonelabMultiplayerMockup.Messages.Handlers.Player;
 using BonelabMultiplayerMockup.Nodes;
 using BonelabMultiplayerMockup.Object;
+using BonelabMultiplayerMockup.Packets;
+using BonelabMultiplayerMockup.Packets.Gun;
+using BonelabMultiplayerMockup.Packets.Player;
 using BonelabMultiplayerMockup.Utils;
 using BoneLib;
 using HarmonyLib;
@@ -34,12 +34,12 @@ namespace BonelabMultiplayerMockup.Patches
         public static IEnumerator WaitForAvatarSwitch()
         {
             yield return new WaitForSecondsRealtime(1f);
-            var swapAvatarMessageData = new AvatarChangeMessageData()
+            var swapAvatarMessageData = new AvatarChangeData()
             {
                 userId = DiscordIntegration.currentUser.Id,
                 barcode = Player.GetRigManager().GetComponentInChildren<RigManager>()._avatarCrate._barcode._id
             };
-            var packetByteBuf = MessageHandler.CompressMessage(NetworkMessageType.AvatarChangeMessage,
+            var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.AvatarChangeMessage,
                 swapAvatarMessageData);
             Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, packetByteBuf.getBytes());
             BonelabMultiplayerMockup.PopulateCurrentAvatarData();
@@ -52,7 +52,16 @@ namespace BonelabMultiplayerMockup.Patches
         public static IEnumerator WaitForNPCSync(GameObject npc)
         {
             yield return new WaitForSecondsRealtime(2);
-            SyncedObject.Sync(npc);
+            SyncedObject syncedObject = SyncedObject.GetSyncedComponent(npc);
+            if (!syncedObject)
+            {
+                SyncedObject.Sync(npc);
+            }
+            else
+            {
+                syncedObject.BroadcastOwnerChange();
+            }
+
         }
 
         public static IEnumerator WaitForAttachSync(GameObject toSync)
@@ -181,12 +190,12 @@ namespace BonelabMultiplayerMockup.Patches
                     SyncedObject syncedObject = SyncedObject.GetSyncedComponent(__instance.gameObject);
                     if (syncedObject)
                     {
-                        var gunStateMessageData = new GunStateMessageData()
+                        var gunStateMessageData = new GunStateData()
                         {
                             objectid = syncedObject.currentId,
                             state = 0
                         };
-                        var packetByteBuf = MessageHandler.CompressMessage(NetworkMessageType.GunStateMessage,
+                        var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.GunStateMessage,
                             gunStateMessageData);
                         Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, packetByteBuf.getBytes());
                     }

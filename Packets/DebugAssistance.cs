@@ -1,10 +1,10 @@
-namespace BonelabMultiplayerMockup.Messages
+namespace BonelabMultiplayerMockup.Packets
 {
     public class DebugAssistance
     {
         public static void SimulatePacket(NetworkMessageType netType, MessageData messageData)
         {
-            var packetByteBuf = MessageHandler.CompressMessage(netType, messageData);
+            var packetByteBuf = PacketHandler.CompressMessage(netType, messageData);
 
             var data = packetByteBuf.getBytes();
             var messageType = data[0];
@@ -15,7 +15,7 @@ namespace BonelabMultiplayerMockup.Messages
 
             var secondBuf = new PacketByteBuf(realData);
 
-            MessageHandler.ReadMessage((NetworkMessageType)messageType, secondBuf, DiscordIntegration.currentUser.Id);
+            PacketHandler.ReadMessage((NetworkMessageType)messageType, secondBuf, DiscordIntegration.currentUser.Id);
         }
     }
 }

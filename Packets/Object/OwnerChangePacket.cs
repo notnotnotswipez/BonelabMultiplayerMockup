@@ -1,8 +1,8 @@
 using BonelabMultiplayerMockup.Object;
 
-namespace BonelabMultiplayerMockup.Messages.Handlers.Object
+namespace BonelabMultiplayerMockup.Packets.Object
 {
-    public class OwnerChangeMessage : MessageReader
+    public class OwnerChangePacket : NetworkPacket
     {
         public override PacketByteBuf CompressData(MessageData messageData)
         {

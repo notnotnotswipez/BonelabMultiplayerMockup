@@ -1,17 +1,15 @@
 using System;
 using System.Collections.Generic;
-using BonelabMultiplayerMockup.Messages.Handlers.Player;
 using BonelabMultiplayerMockup.Nodes;
 using BonelabMultiplayerMockup.Object;
+using BonelabMultiplayerMockup.Packets.Player;
 using BonelabMultiplayerMockup.Patches;
 using BonelabMultiplayerMockup.Utils;
-using MelonLoader;
-using SLZ.AI;
 using UnityEngine;
 
-namespace BonelabMultiplayerMockup.Messages.Handlers.Object
+namespace BonelabMultiplayerMockup.Packets.Object
 {
-    public class InitializeSyncMessage : MessageReader
+    public class InitializeSyncPacket : NetworkPacket
     {
         private static List<ushort> groupIdsQueued = new List<ushort>();
 
@@ -71,11 +69,15 @@ namespace BonelabMultiplayerMockup.Messages.Handlers.Object
                         DebugLogger.Msg("Ended sync Id at: "+SyncedObject.lastId);
                         DebugLogger.Msg("Ended sync at Group ID: "+SyncedObject.lastGroupId);
 
-                        if (SyncedObject.lastId != finalId)
+                        if (DiscordIntegration.isHost)
                         {
-                            SyncedObject.lastId = finalId;
-                            DebugLogger.Error("There was some lost information, corrected the final sync ID to reflect this.");
-                            invalidPacket = true;
+                            var joinCatchupData = new JoinCatchupData
+                            {
+                                lastId = SyncedObject.lastId,
+                                lastGroupId = SyncedObject.lastGroupId
+                            };
+                            var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.IdCatchupMessage, joinCatchupData);
+                            Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, catchupBuff.getBytes());
                         }
 
                         PatchVariables.shouldIgnoreSpawn = false;
@@ -89,16 +91,15 @@ namespace BonelabMultiplayerMockup.Messages.Handlers.Object
                     return;
                 }
                 SyncedObject.FutureSync(foundCopy, groupId, userId);
-                if (SyncedObject.lastId != finalId)
+                if (DiscordIntegration.isHost)
                 {
-                    SyncedObject.lastId = finalId;
-                    invalidPacket = true;
-                    DebugLogger.Error("There was some lost information, corrected the final sync ID to reflect this.");
-                }
-
-                if (invalidPacket)
-                {
-                    DebugLogger.Error("Things went wrong in this sync packet, had to make corrections. (NOT GOOD)");
+                    var joinCatchupData = new JoinCatchupData
+                    {
+                        lastId = SyncedObject.lastId,
+                        lastGroupId = SyncedObject.lastGroupId
+                    };
+                    var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.IdCatchupMessage, joinCatchupData);
+                    Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, catchupBuff.getBytes());
                 }
             }
             else

@@ -1,12 +1,12 @@
 using BonelabMultiplayerMockup.Nodes;
 
-namespace BonelabMultiplayerMockup.Messages.Handlers.Player
+namespace BonelabMultiplayerMockup.Packets.Player
 {
-    public class DisconnectMessage : MessageReader
+    public class DisconnectPacket : NetworkPacket
     {
         public override PacketByteBuf CompressData(MessageData messageData)
         {
-            var disconnectMessageData = (DisconnectMessageData)messageData;
+            var disconnectMessageData = (DisconnectData)messageData;
             var packetByteBuf = new PacketByteBuf();
             packetByteBuf.WriteByte(DiscordIntegration.GetByteId(disconnectMessageData.userId));
             packetByteBuf.create();
@@ -22,7 +22,7 @@ namespace BonelabMultiplayerMockup.Messages.Handlers.Player
         }
     }
 
-    public class DisconnectMessageData : MessageData
+    public class DisconnectData : MessageData
     {
         public long userId;
     }

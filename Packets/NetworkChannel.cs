@@ -1,4 +1,4 @@
-namespace BonelabMultiplayerMockup.Messages
+namespace BonelabMultiplayerMockup.Packets
 {
     public enum NetworkChannel : byte
     {

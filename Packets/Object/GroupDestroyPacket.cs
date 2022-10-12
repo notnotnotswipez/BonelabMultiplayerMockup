@@ -1,20 +1,19 @@
 using System.Collections.Generic;
-using System.Linq;
+using BonelabMultiplayerMockup.NetworkData;
 using BonelabMultiplayerMockup.Object;
-using HBMP.DataType;
 using MelonLoader;
 using UnityEngine;
 
-namespace BonelabMultiplayerMockup.Messages.Handlers.Object
+namespace BonelabMultiplayerMockup.Packets.Object
 {
-    public class GroupDestroyMessage : MessageReader
+    public class GroupDestroyPacket : NetworkPacket
     {
         public override PacketByteBuf CompressData(MessageData messageData)
         {
-            GroupDestroyMessageData groupDestroyMessageData = (GroupDestroyMessageData)messageData;
+            GroupDestroyData groupDestroyData = (GroupDestroyData)messageData;
             PacketByteBuf packetByteBuf = new PacketByteBuf();
-            packetByteBuf.WriteUShort(groupDestroyMessageData.groupId);
-            packetByteBuf.WriteUShort(groupDestroyMessageData.backupObjectId);
+            packetByteBuf.WriteUShort(groupDestroyData.groupId);
+            packetByteBuf.WriteUShort(groupDestroyData.backupObjectId);
             packetByteBuf.create();
 
             return packetByteBuf;
@@ -43,12 +42,15 @@ namespace BonelabMultiplayerMockup.Messages.Handlers.Object
             for (int i = 0; i < syncedObjectsToRemove.Count; i++)
             {
                 SyncedObject syncedObject = syncedObjectsToRemove[i];
-                syncedObject.UpdateObject(new SimplifiedTransform(new Vector3(0, 100, 0), Quaternion.identity));
-                syncedObject.DestroySyncable(false);
-                if (syncedObject.mainReference)
+                if (syncedObject != null)
                 {
-                    GameObject.Destroy(syncedObject.mainReference);
-                    syncedObject.mainReference = null;
+                    syncedObject.UpdateObject(new CompressedTransform(new Vector3(0, 100, 0), Quaternion.identity));
+                    syncedObject.DestroySyncable(false);
+                    if (syncedObject.mainReference)
+                    {
+                        GameObject.Destroy(syncedObject.mainReference);
+                        syncedObject.mainReference = null;
+                    }
                 }
             }
             syncedObjectsToRemove.Clear();
@@ -59,7 +61,7 @@ namespace BonelabMultiplayerMockup.Messages.Handlers.Object
         }
     }
 
-    public class GroupDestroyMessageData : MessageData
+    public class GroupDestroyData : MessageData
     {
         public ushort groupId;
         public ushort backupObjectId;

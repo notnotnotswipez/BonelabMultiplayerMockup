@@ -1,12 +1,12 @@
 using System;
 
-namespace BonelabMultiplayerMockup.Messages.Handlers.Player
+namespace BonelabMultiplayerMockup.Packets.Player
 {
-    public class ShortIdMessage : MessageReader
+    public class ShortIdPacket : NetworkPacket
     {
         public override PacketByteBuf CompressData(MessageData messageData)
         {
-            var shortIdMessageData = (ShortIdMessageData)messageData;
+            var shortIdMessageData = (ShortIdData)messageData;
             var packetByteBuf = new PacketByteBuf();
             packetByteBuf.WriteLong(shortIdMessageData.userId);
             packetByteBuf.WriteByte(shortIdMessageData.byteId);
@@ -31,7 +31,7 @@ namespace BonelabMultiplayerMockup.Messages.Handlers.Player
         }
     }
 
-    public class ShortIdMessageData : MessageData
+    public class ShortIdData : MessageData
     {
         public byte byteId;
         public long userId;

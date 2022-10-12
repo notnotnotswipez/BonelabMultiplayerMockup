@@ -1,13 +1,12 @@
 using BonelabMultiplayerMockup.Object;
-using MelonLoader;
 
-namespace BonelabMultiplayerMockup.Messages.Handlers.Player
+namespace BonelabMultiplayerMockup.Packets.Player
 {
-    public class JoinCatchupMessage : MessageReader
+    public class JoinCatchupPacket : NetworkPacket
     {
         public override PacketByteBuf CompressData(MessageData messageData)
         {
-            var joinCatchupData = (IdCatchupData)messageData;
+            var joinCatchupData = (JoinCatchupData)messageData;
             var packetByteBuf = new PacketByteBuf();
             packetByteBuf.WriteUShort(joinCatchupData.lastId);
             packetByteBuf.WriteUShort(joinCatchupData.lastGroupId);
@@ -25,7 +24,7 @@ namespace BonelabMultiplayerMockup.Messages.Handlers.Player
         }
     }
 
-    public class IdCatchupData : MessageData
+    public class JoinCatchupData : MessageData
     {
         public ushort lastGroupId;
         public ushort lastId;

@@ -1,4 +1,3 @@
-using System;
 using System.Collections;
 using BonelabMultiplayerMockup.Object;
 using BonelabMultiplayerMockup.Patches;
@@ -7,9 +6,9 @@ using MelonLoader;
 using SLZ.Interaction;
 using UnityEngine;
 
-namespace BonelabMultiplayerMockup.Messages.Handlers.Gun
+namespace BonelabMultiplayerMockup.Packets.Gun
 {
-    public class GunStateMessage : MessageReader
+    public class GunStatePacket : NetworkPacket
     {
         private bool runningEnumerator = false;
         public IEnumerator IgnoreGunReference()
@@ -33,10 +32,10 @@ namespace BonelabMultiplayerMockup.Messages.Handlers.Gun
 
         public override PacketByteBuf CompressData(MessageData messageData)
         {
-            GunStateMessageData gunStateMessageData = (GunStateMessageData)messageData;
+            GunStateData gunStateData = (GunStateData)messageData;
             PacketByteBuf packetByteBuf = new PacketByteBuf();
-            packetByteBuf.WriteByte(gunStateMessageData.state);
-            packetByteBuf.WriteUShort(gunStateMessageData.objectid);
+            packetByteBuf.WriteByte(gunStateData.state);
+            packetByteBuf.WriteUShort(gunStateData.objectid);
             packetByteBuf.create();
 
             return packetByteBuf;
@@ -88,7 +87,7 @@ namespace BonelabMultiplayerMockup.Messages.Handlers.Gun
         }
     }
 
-    public class GunStateMessageData : MessageData
+    public class GunStateData : MessageData
     {
         public ushort objectid;
         public byte state;

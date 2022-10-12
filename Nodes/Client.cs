@@ -1,7 +1,5 @@
 using System;
 using System.Linq;
-using BonelabMultiplayerMockup.Messages;
-using BonelabMultiplayerMockup.Messages.Handlers.Player;
 using BonelabMultiplayerMockup.Representations;
 using BoneLib;
 using Discord;

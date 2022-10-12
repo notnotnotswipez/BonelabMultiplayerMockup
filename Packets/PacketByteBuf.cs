@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
-using HBMP.DataType;
+using BonelabMultiplayerMockup.NetworkData;
 
-namespace BonelabMultiplayerMockup.Messages
+namespace BonelabMultiplayerMockup.Packets
 {
     public class PacketByteBuf
     {
@@ -36,20 +36,20 @@ namespace BonelabMultiplayerMockup.Messages
             return getBytes()[byteIndex++];
         }
 
-        public SimplifiedTransform ReadSimpleTransform()
+        public CompressedTransform ReadCompressedTransform()
         {
             var transformBytes = new List<byte>();
-            var finalIndex = byteIndex + SimplifiedTransform.size;
+            var finalIndex = byteIndex + CompressedTransform.length;
             for (var i = byteIndex; i < finalIndex; i++) transformBytes.Add(getBytes()[i]);
-            var simpleTransform = SimplifiedTransform.FromBytes(transformBytes.ToArray());
-            byteIndex += SimplifiedTransform.size;
+            var compressedTransform = new CompressedTransform(transformBytes.ToArray());
+            byteIndex += CompressedTransform.length;
 
-            return simpleTransform;
+            return compressedTransform;
         }
-
-        public void WriteSimpleTransform(SimplifiedTransform simplifiedTransform)
+        
+        public void WriteCompressedTransform(CompressedTransform compressedTransform)
         {
-            foreach (var b in simplifiedTransform.GetBytes()) byteList.Add(b);
+            foreach (var b in compressedTransform.GetBytes()) byteList.Add(b);
         }
 
         public string ReadString()
@@ -60,10 +60,17 @@ namespace BonelabMultiplayerMockup.Messages
             return Encoding.UTF8.GetString(pathBytes);
         }
 
-        public float ReadLong()
+        public long ReadLong()
         {
             var longNum = BitConverter.ToInt64(getBytes(), byteIndex);
             byteIndex += sizeof(long);
+            return longNum;
+        }
+        
+        public float ReadFloat()
+        {
+            var longNum = BitConverter.ToSingle(getBytes(), byteIndex);
+            byteIndex += sizeof(float);
             return longNum;
         }
 
@@ -71,6 +78,13 @@ namespace BonelabMultiplayerMockup.Messages
         {
             var longNum = BitConverter.ToInt32(getBytes(), byteIndex);
             byteIndex += sizeof(int);
+            return longNum;
+        }
+        
+        public short ReadShort()
+        {
+            var longNum = BitConverter.ToInt16(getBytes(), byteIndex);
+            byteIndex += sizeof(short);
             return longNum;
         }
 
@@ -113,6 +127,11 @@ namespace BonelabMultiplayerMockup.Messages
         }
 
         public void WriteUShort(ushort shor)
+        {
+            foreach (var b in BitConverter.GetBytes(shor)) byteList.Add(b);
+        }
+        
+        public void WriteShort(short shor)
         {
             foreach (var b in BitConverter.GetBytes(shor)) byteList.Add(b);
         }

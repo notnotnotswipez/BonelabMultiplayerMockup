@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 
-namespace BonelabMultiplayerMockup.Messages
+namespace BonelabMultiplayerMockup.Packets
 {
-    public abstract class MessageReader
+    public abstract class NetworkPacket
     {
         public abstract PacketByteBuf CompressData(MessageData messageData);
         public abstract void ReadData(PacketByteBuf packetByteBuf, long sender);

@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using Discord;
-using HBMP.Extensions;
 using MelonLoader;
 
 namespace BonelabMultiplayerMockup
@@ -105,7 +104,12 @@ namespace BonelabMultiplayerMockup
         {
             if (shortId == 0) return lobby.OwnerId;
 
-            return byteIds.TryIdx(shortId);
+            if (byteIds.ContainsKey(shortId))
+            {
+                return byteIds[shortId];
+            }
+
+            return 1278;
         }
 
         public static byte RegisterUser(long userId)

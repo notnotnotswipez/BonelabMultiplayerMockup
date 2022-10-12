@@ -1,11 +1,11 @@
 using System.Collections.Generic;
-using BonelabMultiplayerMockup.Messages;
-using BonelabMultiplayerMockup.Messages.Handlers.Player;
+using BonelabMultiplayerMockup.NetworkData;
 using BonelabMultiplayerMockup.Nodes;
+using BonelabMultiplayerMockup.Packets;
+using BonelabMultiplayerMockup.Packets.Player;
 using BonelabMultiplayerMockup.Utils;
 using BoneLib;
 using Discord;
-using HBMP.DataType;
 using MelonLoader;
 using UnityEngine;
 using Avatar = SLZ.VRMK.Avatar;
@@ -36,7 +36,7 @@ namespace BonelabMultiplayerMockup.Representations
             {
                 // yep
             };
-            var catchupBuff = MessageHandler.CompressMessage(NetworkMessageType.AvatarQuestionMessage, avatarAskData);
+            var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.AvatarQuestionMessage, avatarAskData);
             Node.activeNode.SendMessage(this.user.Id, (byte)NetworkChannel.Transaction, catchupBuff.getBytes());
         }
 
@@ -57,7 +57,9 @@ namespace BonelabMultiplayerMockup.Representations
                 GameObject backupCopy = GameObject.Instantiate(go);
                 backupCopy.name = "(PlayerRep) " + username;
                 playerRep = backupCopy;
-                PopulateBoneDictionary(backupCopy.GetComponentInChildren<Avatar>().gameObject.transform);
+                Avatar avatarAgain = backupCopy.GetComponentInChildren<Avatar>();
+                avatarAgain.PrecomputeAvatar();
+                PopulateBoneDictionary(avatarAgain.gameObject.transform);
                 GameObject.DontDestroyOnLoad(backupCopy);
                 return;
             }
@@ -65,7 +67,9 @@ namespace BonelabMultiplayerMockup.Representations
             GameObject copy = GameObject.Instantiate(go);
             copy.name = "(PlayerRep) " + username;
             playerRep = copy;
-            PopulateBoneDictionary(copy.GetComponentInChildren<Avatar>().gameObject.transform);
+            Avatar avatar = copy.GetComponentInChildren<Avatar>();
+            avatar.PrecomputeAvatar();
+            PopulateBoneDictionary(avatar.gameObject.transform);
             GameObject.DontDestroyOnLoad(copy);
         }
 
@@ -82,17 +86,22 @@ namespace BonelabMultiplayerMockup.Representations
             }
         }
 
-        public void updateIkTransform(byte boneId, SimplifiedTransform simplifiedTransform)
+        public void updateIkTransform(byte boneId, CompressedTransform compressedTransform)
         {
             if (playerRep == null) return;
+            
+            if (!playerRep.activeSelf)
+            {
+                playerRep.SetActive(true);
+            }
 
             if (boneDictionary.ContainsKey(boneId))
             {
                 var selectedBone = boneDictionary[boneId];
                 if (selectedBone != null)
                 {
-                    selectedBone.transform.position = simplifiedTransform.position;
-                    selectedBone.transform.eulerAngles = simplifiedTransform.rotation.ExpandQuat().eulerAngles;
+                    selectedBone.transform.position = compressedTransform.position;
+                    selectedBone.transform.eulerAngles = compressedTransform.rotation.eulerAngles;
                 }
             }
         }

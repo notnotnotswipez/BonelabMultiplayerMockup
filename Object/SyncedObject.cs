@@ -2,14 +2,15 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using BonelabMultiplayerMockup.Messages;
-using BonelabMultiplayerMockup.Messages.Handlers.Object;
+using BonelabMultiplayerMockup.NetworkData;
 using BonelabMultiplayerMockup.Nodes;
+using BonelabMultiplayerMockup.Packets;
+using BonelabMultiplayerMockup.Packets.Object;
 using BonelabMultiplayerMockup.Utils;
 using BoneLib;
-using HBMP.DataType;
 using MelonLoader;
 using SLZ.AI;
+using SLZ.Marrow.Pool;
 using UnityEngine;
 
 namespace BonelabMultiplayerMockup.Object
@@ -196,19 +197,19 @@ namespace BonelabMultiplayerMockup.Object
             var shouldSendUpdate = HasChangedPositions();
             if (IsClientSimulated() && shouldSendUpdate)
             {
-                var simplifiedTransform =
-                    new SimplifiedTransform(gameObject.transform.position,
+                var compressedTransform =
+                    new CompressedTransform(gameObject.transform.position,
                         Quaternion.Euler(gameObject.transform.eulerAngles));
 
                 var transformUpdateData = new TransformUpdateData
                 {
                     objectId = currentId,
                     userId = DiscordIntegration.currentUser.Id,
-                    sTransform = simplifiedTransform
+                    compressedTransform = compressedTransform
                 };
 
                 var packetByteBuf =
-                    MessageHandler.CompressMessage(NetworkMessageType.TransformUpdateMessage, transformUpdateData);
+                    PacketHandler.CompressMessage(NetworkMessageType.TransformUpdateMessage, transformUpdateData);
                 Node.activeNode.BroadcastMessage((byte)NetworkChannel.Unreliable, packetByteBuf.getBytes());
             }
 
@@ -229,7 +230,7 @@ namespace BonelabMultiplayerMockup.Object
                     userId = currentUserId,
                     objectId = currentId
                 };
-                var packetByteBuf = MessageHandler.CompressMessage(NetworkMessageType.OwnerChangeMessage,
+                var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.OwnerChangeMessage,
                     ownerQueueChangeData);
                 Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, packetByteBuf.getBytes());
                 DebugLogger.Msg("Transferring ownership of whole group ID: " + groupId);
@@ -268,7 +269,7 @@ namespace BonelabMultiplayerMockup.Object
                 userId = userId,
                 objectId = currentId
             };
-            var packetByteBuf = MessageHandler.CompressMessage(NetworkMessageType.OwnerChangeMessage,
+            var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.OwnerChangeMessage,
                 ownerQueueChangeData);
             Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, packetByteBuf.getBytes());
 
@@ -282,7 +283,7 @@ namespace BonelabMultiplayerMockup.Object
             }
         }
 
-        public static void CleanData()
+        public static void CleanData(bool deleteIfPossible = false)
         {
             lastId = 0;
             lastGroupId = 0;
@@ -290,7 +291,23 @@ namespace BonelabMultiplayerMockup.Object
                 if (gameObject != null)
                 {
                     var syncedObject = gameObject.GetComponent<SyncedObject>();
-                    Destroy(syncedObject);
+                    if (syncedObject != null)
+                    {
+                        if (deleteIfPossible)
+                        {
+                            if (!syncedObject.IsClientSimulated())
+                            {
+                                // Means it was spawned in (was NOT in the map)
+                                if (syncedObject.mainReference != null)
+                                {
+                                    Destroy(syncedObject.mainReference);
+                                    continue;
+                                }
+                            }
+                        }
+                    
+                        Destroy(syncedObject);
+                    }
                 }
 
             syncedObjectIds.Clear();
@@ -364,6 +381,9 @@ namespace BonelabMultiplayerMockup.Object
             syncedObject.SetOwner(ownerId);
             syncedObject.currentId = objectId;
             syncedObject.groupId = groupId;
+            
+            
+            
             DebugLogger.Msg("Made sync object for: " + gameObject.name + ", with an ID of: " + objectId +
                             ", and group ID of: " + groupId);
             DebugLogger.Msg("Owner: " + ownerId);
@@ -413,7 +433,7 @@ namespace BonelabMultiplayerMockup.Object
                 };
 
                 var packetByteBuf =
-                    MessageHandler.CompressMessage(NetworkMessageType.InitializeSyncMessage, initializeSyncData);
+                    PacketHandler.CompressMessage(NetworkMessageType.InitializeSyncMessage, initializeSyncData);
 
                 Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, packetByteBuf.getBytes());
                 DebugLogger.Msg("Starting Id: " + startingId);
@@ -459,7 +479,7 @@ namespace BonelabMultiplayerMockup.Object
                 lastGroupId++;
             }
 
-            var syncedId = GetObjectId();
+            var syncedId = GetSyncId();
 
             var syncedObject = gameObject.AddComponent<SyncedObject>();
             if (relatedSyncedObjects.ContainsKey(groupId))
@@ -527,7 +547,7 @@ namespace BonelabMultiplayerMockup.Object
 
             DebugLogger.Msg("Attempting to sync object, base path is: " + syncObject);
 
-            var syncedId = GetObjectId();
+            var syncedId = GetSyncId();
             DebugLogger.Msg("Sync ID: " + syncedId);
 
 
@@ -636,8 +656,11 @@ namespace BonelabMultiplayerMockup.Object
             if (baseRigidBody) rigidbodies.Add(baseRigidBody);
 
             foreach (var rigidbody in ultimateParent.transform.gameObject.GetComponentsInChildren<Rigidbody>())
-                if (!rigidbodies.Contains(rigidbody))
+                if (!rigidbodies.Contains(rigidbody) && !rigidbody.isKinematic)
+                {
                     rigidbodies.Add(rigidbody);
+                }
+                    
 
             DebugLogger.Msg("Found: " + rigidbodies.Count + " for object:" + ultimateParent.transform.name);
             return rigidbodies.ToArray();
@@ -721,22 +744,32 @@ namespace BonelabMultiplayerMockup.Object
             return null;
         }
 
-        public void UpdateObject(SimplifiedTransform simplifiedTransform)
+        public void UpdateObject(CompressedTransform compressedTransform)
         {
             if (!IsClientSimulated())
             {
+                if (!gameObject.activeInHierarchy)
+                {
+                    Transform parent = gameObject.transform;
+                    while (parent.gameObject.activeSelf)
+                    {
+                        parent = parent.parent;
+                    }
+                    parent.gameObject.SetActive(true);
+                }
+
                 if (_rigidbody)
                 {
                     _rigidbody.velocity = new Vector3(0, 0, 0);
                     _rigidbody.isKinematic = true;
                 }
 
-                gameObject.transform.position = simplifiedTransform.position;
-                gameObject.transform.eulerAngles = simplifiedTransform.rotation.ExpandQuat().eulerAngles;
+                gameObject.transform.position = compressedTransform.position;
+                gameObject.transform.eulerAngles = compressedTransform.rotation.eulerAngles;
             }
         }
 
-        public static ushort GetObjectId()
+        public static ushort GetSyncId()
         {
             return lastId++;
         }

@@ -1,12 +1,12 @@
 using BonelabMultiplayerMockup.Nodes;
 
-namespace BonelabMultiplayerMockup.Messages.Handlers.Player
+namespace BonelabMultiplayerMockup.Packets.Player
 {
-    public class RequestIdsMessage : MessageReader
+    public class RequestIdsPacket : NetworkPacket
     {
         public override PacketByteBuf CompressData(MessageData messageData)
         {
-            var requestIdsMessageData = (RequestIdsMessageData)messageData;
+            var requestIdsMessageData = (RequestIdsData)messageData;
 
             var packetByteBuf = new PacketByteBuf();
             packetByteBuf.WriteByte(DiscordIntegration.GetByteId(requestIdsMessageData.userId));
@@ -21,19 +21,19 @@ namespace BonelabMultiplayerMockup.Messages.Handlers.Player
             if (Server.instance != null)
                 foreach (var valuePair in DiscordIntegration.byteIds)
                 {
-                    var addMessageData = new ShortIdMessageData
+                    var addMessageData = new ShortIdData
                     {
                         userId = valuePair.Value,
                         byteId = valuePair.Key
                     };
                     var shortBuf =
-                        MessageHandler.CompressMessage(NetworkMessageType.ShortIdUpdateMessage, addMessageData);
+                        PacketHandler.CompressMessage(NetworkMessageType.ShortIdUpdateMessage, addMessageData);
                     Server.instance.SendMessage(userId, (byte)NetworkChannel.Reliable, shortBuf.getBytes());
                 }
         }
     }
 
-    public class RequestIdsMessageData : MessageData
+    public class RequestIdsData : MessageData
     {
         public long userId;
     }

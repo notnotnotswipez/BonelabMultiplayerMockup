@@ -2,16 +2,17 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
-using BonelabMultiplayerMockup.Messages;
-using BonelabMultiplayerMockup.Messages.Handlers.Object;
-using BonelabMultiplayerMockup.Messages.Handlers.Player;
+using BonelabMultiplayerMockup.NetworkData;
 using BonelabMultiplayerMockup.Nodes;
 using BonelabMultiplayerMockup.Object;
+using BonelabMultiplayerMockup.Packets;
+using BonelabMultiplayerMockup.Packets.Object;
+using BonelabMultiplayerMockup.Packets.Player;
+using BonelabMultiplayerMockup.Packets.Reset;
 using BonelabMultiplayerMockup.Patches;
 using BonelabMultiplayerMockup.Representations;
 using BonelabMultiplayerMockup.Utils;
 using BoneLib;
-using HBMP.DataType;
 using MelonLoader;
 using SLZ.Rig;
 using UnityEngine;
@@ -61,7 +62,7 @@ namespace BonelabMultiplayerMockup
         public override void OnApplicationStart()
         {
             GameSDK.LoadGameSDK();
-            MessageHandler.RegisterHandlers();
+            PacketHandler.RegisterPackets();
             DiscordIntegration.Init();
             Client.StartClient();
             DataDirectory.Initialize();
@@ -89,6 +90,27 @@ namespace BonelabMultiplayerMockup
                     {
                         DebugLogger.Msg("Loaded a new scene zone!");
                         MelonCoroutines.Start(PatchCoroutines.WaitForAvatarSwitch());
+                        if (DiscordIntegration.isHost)
+                        {
+                            var syncResetData = new SyncResetData()
+                            {
+                                // empty data
+                            };
+                            PacketByteBuf packetByteBuf =
+                                PacketHandler.CompressMessage(NetworkMessageType.SyncResetMessage, syncResetData);
+                            Node.activeNode.BroadcastMessage((byte)NetworkChannel.Transaction ,packetByteBuf.getBytes());
+                        
+                            SyncedObject.CleanData(true);
+                        
+                            if (BoneLib.Player.GetObjectInHand(BoneLib.Player.leftHand) != null)
+                            {
+                                SyncedObject.Sync(BoneLib.Player.GetObjectInHand(BoneLib.Player.leftHand));
+                            }
+                            if (BoneLib.Player.GetObjectInHand(BoneLib.Player.rightHand) != null)
+                            {
+                                SyncedObject.Sync(BoneLib.Player.GetObjectInHand(BoneLib.Player.rightHand));
+                            }
+                        }
                     }
                 }
             }
@@ -99,6 +121,40 @@ namespace BonelabMultiplayerMockup
             if (Input.GetKey(KeyCode.S))
             {
                 Server.StartServer();
+            }
+
+            if (Input.GetKey(KeyCode.P))
+            {
+                MelonLogger.Msg("Server shutdown!");
+                Server.instance.Shutdown();
+            }
+            
+            if (Input.GetKey(KeyCode.O))
+            {
+                if (DiscordIntegration.hasLobby)
+                {
+                    if (DiscordIntegration.isHost)
+                    {
+                        var syncResetData = new SyncResetData()
+                        {
+                            // empty data
+                        };
+                        PacketByteBuf packetByteBuf =
+                            PacketHandler.CompressMessage(NetworkMessageType.SyncResetMessage, syncResetData);
+                        Node.activeNode.BroadcastMessage((byte)NetworkChannel.Transaction ,packetByteBuf.getBytes());
+                        
+                        SyncedObject.CleanData(true);
+                        
+                        if (BoneLib.Player.GetObjectInHand(BoneLib.Player.leftHand) != null)
+                        {
+                            SyncedObject.Sync(BoneLib.Player.GetObjectInHand(BoneLib.Player.leftHand));
+                        }
+                        if (BoneLib.Player.GetObjectInHand(BoneLib.Player.rightHand) != null)
+                        {
+                            SyncedObject.Sync(BoneLib.Player.GetObjectInHand(BoneLib.Player.rightHand));
+                        }
+                    }
+                }
             }
 
             updateCount++;
@@ -147,13 +203,13 @@ namespace BonelabMultiplayerMockup
                             }
 
                             ushort groupId = SyncedObject.queuedObjectsToDelete[i];
-                            GroupDestroyMessageData groupDestroyMessageData = new GroupDestroyMessageData()
+                            GroupDestroyData groupDestroyData = new GroupDestroyData()
                             {
                                 groupId = groupId,
                                 backupObjectId = lastId
                             };
 
-                            PacketByteBuf message = MessageHandler.CompressMessage(NetworkMessageType.GroupDestroyMessage, groupDestroyMessageData);
+                            PacketByteBuf message = PacketHandler.CompressMessage(NetworkMessageType.GroupDestroyMessage, groupDestroyData);
                             Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, message.getBytes());
                         }
 
@@ -175,17 +231,17 @@ namespace BonelabMultiplayerMockup
                     break;
                 }
 
-                var simplifiedTransform = new SimplifiedTransform(bone.transform.position,
+                var simplifiedTransform = new CompressedTransform(bone.transform.position,
                     Quaternion.Euler(bone.transform.eulerAngles));
 
-                PlayerSyncMessageData playerSyncMessageData = new PlayerSyncMessageData()
+                PlayerBoneData playerBoneData = new PlayerBoneData()
                 {
                     userId = DiscordIntegration.currentUser.Id,
                     boneId = i,
                     transform = simplifiedTransform
                 };
 
-                PacketByteBuf message = MessageHandler.CompressMessage(NetworkMessageType.PlayerUpdateMessage, playerSyncMessageData);
+                PacketByteBuf message = PacketHandler.CompressMessage(NetworkMessageType.PlayerUpdateMessage, playerBoneData);
                 Node.activeNode.BroadcastMessage((byte)NetworkChannel.Unreliable, message.getBytes());
             }
         }

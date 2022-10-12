@@ -1,17 +1,16 @@
-using System;
 using BonelabMultiplayerMockup.Representations;
 using MelonLoader;
 
-namespace BonelabMultiplayerMockup.Messages.Handlers.Player
+namespace BonelabMultiplayerMockup.Packets.Player
 {
-    public class AvatarChangeMessage : MessageReader
+    public class AvatarChangePacket : NetworkPacket
     {
         public override PacketByteBuf CompressData(MessageData messageData)
         {
-            AvatarChangeMessageData avatarChangeMessageData = (AvatarChangeMessageData)messageData;
+            AvatarChangeData avatarChangeData = (AvatarChangeData)messageData;
             PacketByteBuf packetByteBuf = new PacketByteBuf();
-            packetByteBuf.WriteByte(DiscordIntegration.GetByteId(avatarChangeMessageData.userId));
-            packetByteBuf.WriteString(avatarChangeMessageData.barcode);
+            packetByteBuf.WriteByte(DiscordIntegration.GetByteId(avatarChangeData.userId));
+            packetByteBuf.WriteString(avatarChangeData.barcode);
             packetByteBuf.create();
 
             return packetByteBuf;
@@ -32,7 +31,7 @@ namespace BonelabMultiplayerMockup.Messages.Handlers.Player
         }
     }
 
-    public class AvatarChangeMessageData : MessageData
+    public class AvatarChangeData : MessageData
     {
         public string barcode;
         public long userId;
