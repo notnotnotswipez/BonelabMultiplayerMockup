@@ -1,4 +1,4 @@
-namespace BonelabMultiplayerMockup.Messages
+namespace BonelabMultiplayerMockup.Packets
 {
     public enum NetworkMessageType : byte
     {
@@ -15,6 +15,7 @@ namespace BonelabMultiplayerMockup.Messages
         GunStateMessage = 10,
         MagInsertMessage = 11,
         GroupDestroyMessage = 12,
-        AvatarQuestionMessage = 13
+        AvatarQuestionMessage = 13,
+        SyncResetMessage = 14
     }
 }
