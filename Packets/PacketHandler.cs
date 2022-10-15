@@ -27,6 +27,7 @@ namespace BonelabMultiplayerMockup.Packets
             MessageReaders.Add(NetworkMessageType.GroupDestroyPacket, new GroupDestroyPacket());
             MessageReaders.Add(NetworkMessageType.AvatarQuestionPacket, new AvatarQuestionPacket());
             MessageReaders.Add(NetworkMessageType.SyncResetPacket, new SyncResetPacket());
+            MessageReaders.Add(NetworkMessageType.PlayerColliderPacket, new PlayerColliderPacket());
         }
 
         public static void ReadMessage(NetworkMessageType messageType, PacketByteBuf packetByteBuf, long sender)

@@ -1,12 +1,18 @@
+using System.Collections;
 using System.Collections.Generic;
 using BonelabMultiplayerMockup.NetworkData;
 using BonelabMultiplayerMockup.Nodes;
 using BonelabMultiplayerMockup.Packets;
 using BonelabMultiplayerMockup.Packets.Player;
+using BonelabMultiplayerMockup.Patches;
 using BonelabMultiplayerMockup.Utils;
 using BoneLib;
 using Discord;
 using MelonLoader;
+using SLZ.Interaction;
+using SLZ.Rig;
+using UnhollowerBaseLib;
+using UnhollowerRuntimeLib;
 using UnityEngine;
 using Avatar = SLZ.VRMK.Avatar;
 
@@ -18,12 +24,10 @@ namespace BonelabMultiplayerMockup.Representations
             new Dictionary<long, PlayerRepresentation>();
         
         public Dictionary<byte, GameObject> boneDictionary = new Dictionary<byte, GameObject>();
+        public Dictionary<byte, GameObject> colliderDictionary = new Dictionary<byte, GameObject>();
 
         private byte currentBoneId;
-        public Transform handL;
-        public Transform handR;
-
-        public Transform head;
+        private byte currentColliderId = 0;
         public GameObject playerRep;
         public User user;
         public string username;
@@ -43,14 +47,34 @@ namespace BonelabMultiplayerMockup.Representations
         public void SetAvatar(string barcode)
         {
             currentBoneId = 0;
+            currentColliderId = 0;
             boneDictionary.Clear();
+            colliderDictionary.Clear();
             if (playerRep != null) UnityEngine.Object.Destroy(playerRep);
 
             AssetsManager.LoadAvatar(barcode, FinalizeAvatar);
         }
 
+        private IEnumerator FinalizeColliders(string originalBarcode)
+        {
+            RigManager rigManager = Player.GetRigManager().GetComponent<RigManager>();
+            PatchVariables.shouldIgnoreAvatarSwitch = true;
+            rigManager.SwitchAvatar(GameObject.Instantiate(playerRep).GetComponent<Avatar>());
+            yield return new WaitForSecondsRealtime(1f);
+            PopulateColliderDictionary();
+            AssetsManager.LoadAvatar(originalBarcode, o =>
+            {
+                GameObject spawned = GameObject.Instantiate(o);
+                rigManager.SwitchAvatar(spawned.GetComponent<Avatar>());
+            });
+            yield return new WaitForSecondsRealtime(3f);
+            PatchVariables.shouldIgnoreAvatarSwitch = false;
+            BonelabMultiplayerMockup.PopulateCurrentAvatarData();
+        }
+
         private void FinalizeAvatar(GameObject go)
         {
+            string original = Player.GetRigManager().GetComponentInChildren<RigManager>()._avatarCrate._barcode._id;
             if (playerRep != null)
             {
                 GameObject.Destroy(playerRep);
@@ -59,7 +83,8 @@ namespace BonelabMultiplayerMockup.Representations
                 playerRep = backupCopy;
                 Avatar avatarAgain = backupCopy.GetComponentInChildren<Avatar>();
                 PopulateBoneDictionary(avatarAgain.gameObject.transform);
-                GameObject.DontDestroyOnLoad(backupCopy);
+                GameObject.DontDestroyOnLoad(playerRep);
+                MelonCoroutines.Start(FinalizeColliders(original));
                 return;
             }
 
@@ -69,7 +94,10 @@ namespace BonelabMultiplayerMockup.Representations
             Avatar avatar = copy.GetComponentInChildren<Avatar>();
             PopulateBoneDictionary(avatar.gameObject.transform);
             GameObject.DontDestroyOnLoad(copy);
+            MelonCoroutines.Start(FinalizeColliders(original));
         }
+        
+        
 
         private void PopulateBoneDictionary(Transform parent)
         {
@@ -84,6 +112,76 @@ namespace BonelabMultiplayerMockup.Representations
             }
         }
 
+        private void PopulateColliderDictionary()
+        {
+            GameObject colliderParent = new GameObject("allColliders");
+
+            foreach (var collider in Player.GetPhysicsRig().GetComponentsInChildren<MeshCollider>())
+            {
+                if (collider.isTrigger)
+                {
+                    continue;
+                }
+
+                GameObject gameObject = new GameObject("collider" + currentColliderId);
+                MeshCollider meshCollider = gameObject.AddComponent<MeshCollider>();
+                meshCollider.convex = collider.convex;
+                meshCollider.sharedMesh = GameObject.Instantiate(collider.sharedMesh);
+                meshCollider.inflateMesh = collider.inflateMesh;
+                meshCollider.smoothSphereCollisions = collider.smoothSphereCollisions;
+                meshCollider.skinWidth = collider.skinWidth;
+                gameObject.transform.parent = colliderParent.transform;
+
+                Rigidbody rigidbody = gameObject.AddComponent<Rigidbody>();
+                rigidbody.isKinematic = true;
+                GenericGrip genericGrip = gameObject.AddComponent<GenericGrip>();
+                genericGrip._targetColliders.Add(meshCollider);
+                colliderDictionary.Add(currentColliderId++, gameObject);
+            }
+
+            foreach (var collider in Player.GetPhysicsRig().GetComponentsInChildren<BoxCollider>())
+            {
+                if (collider.isTrigger)
+                {
+                    continue;
+                }
+
+                GameObject gameObject = new GameObject("collider" + currentColliderId);
+                BoxCollider boxCollider = gameObject.AddComponent<BoxCollider>();
+                boxCollider.center = collider.center;
+                boxCollider.size = collider.size;
+                gameObject.transform.parent = colliderParent.transform;
+                Rigidbody rigidbody = gameObject.AddComponent<Rigidbody>();
+                rigidbody.isKinematic = true;
+                GenericGrip genericGrip = gameObject.AddComponent<GenericGrip>();
+                genericGrip._targetColliders.Add(boxCollider);
+                colliderDictionary.Add(currentColliderId++, gameObject);
+            }
+
+            foreach (var collider in Player.GetPhysicsRig().GetComponentsInChildren<CapsuleCollider>())
+            {
+                if (collider.isTrigger)
+                {
+                    continue;
+                }
+
+                GameObject gameObject = new GameObject("collider" + currentColliderId);
+                CapsuleCollider capsuleCollider = gameObject.AddComponent<CapsuleCollider>();
+                capsuleCollider.center = collider.center;
+                capsuleCollider.direction = collider.direction;
+                capsuleCollider.height = collider.height;
+                capsuleCollider.radius = collider.radius;
+                gameObject.transform.parent = colliderParent.transform;
+                Rigidbody rigidbody = gameObject.AddComponent<Rigidbody>();
+                rigidbody.isKinematic = true;
+                GenericGrip genericGrip = gameObject.AddComponent<GenericGrip>();
+                genericGrip._targetColliders.Add(capsuleCollider);
+                colliderDictionary.Add(currentColliderId++, gameObject);
+            }
+
+            colliderParent.transform.parent = playerRep.transform;
+        }
+
         public void updateIkTransform(byte boneId, CompressedTransform compressedTransform)
         {
             if (playerRep == null) return;
@@ -96,6 +194,21 @@ namespace BonelabMultiplayerMockup.Representations
             if (boneDictionary.ContainsKey(boneId))
             {
                 var selectedBone = boneDictionary[boneId];
+                if (selectedBone != null)
+                {
+                    selectedBone.transform.position = compressedTransform.position;
+                    selectedBone.transform.eulerAngles = compressedTransform.rotation.eulerAngles;
+                }
+            }
+        }
+        
+        public void updateColliderTransform(byte colliderId, CompressedTransform compressedTransform)
+        {
+            if (playerRep == null) return;
+
+            if (colliderDictionary.ContainsKey(colliderId))
+            {
+                var selectedBone = colliderDictionary[colliderId];
                 if (selectedBone != null)
                 {
                     selectedBone.transform.position = compressedTransform.position;

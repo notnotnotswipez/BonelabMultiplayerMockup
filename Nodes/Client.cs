@@ -70,6 +70,7 @@ namespace BonelabMultiplayerMockup.Nodes
                 Size = new PartySize { CurrentSize = users.Count(), MaxSize = (int)lobby.Capacity }
             };
 
+            DiscordIntegration.activity.Details = "This user is connected to a BLMP server!";
             DiscordIntegration.activity.State = "Killing with friends";
 
             DiscordIntegration.activity.Secrets = new ActivitySecrets

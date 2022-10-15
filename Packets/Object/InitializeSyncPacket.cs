@@ -39,8 +39,10 @@ namespace BonelabMultiplayerMockup.Packets.Object
 
             DebugLogger.Msg("Received sync request for: " + objectName);
 
-            bool invalidPacket = false;
-            SyncedObject.lastId = objectId;
+            if (SyncedObject.lastId < objectId)
+            {
+                SyncedObject.lastId = objectId;
+            }
 
             if (!SyncedObject.syncedObjectIds.ContainsKey(objectId))
             {
@@ -56,7 +58,6 @@ namespace BonelabMultiplayerMockup.Packets.Object
                         return;
                     }
                     DebugLogger.Msg("Barcode: " + barcode);
-                    PatchVariables.shouldIgnoreSpawn = true;
                     PoolManager.SpawnGameObject(barcode, new Vector3(0, 0, 0), Quaternion.identity, o =>
                     {
                         DebugLogger.Msg("Spawned object! "+" "+barcode);
@@ -64,23 +65,10 @@ namespace BonelabMultiplayerMockup.Packets.Object
                         SyncedObject.FutureSync(o, groupId, userId);
                         foreach (var syncedObjectComponent in o.GetComponentsInChildren<SyncedObject>())
                         {
-                            syncedObjectComponent.mainReference = o;
+                            syncedObjectComponent.spawnedObject = true;
                         }
                         DebugLogger.Msg("Ended sync Id at: "+SyncedObject.lastId);
                         DebugLogger.Msg("Ended sync at Group ID: "+SyncedObject.lastGroupId);
-
-                        if (DiscordIntegration.isHost)
-                        {
-                            var joinCatchupData = new JoinCatchupData
-                            {
-                                lastId = SyncedObject.lastId,
-                                lastGroupId = SyncedObject.lastGroupId
-                            };
-                            var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.IdCatchupPacket, joinCatchupData);
-                            Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, catchupBuff.getBytes());
-                        }
-
-                        PatchVariables.shouldIgnoreSpawn = false;
                     });
                     return;
                 }
@@ -91,16 +79,6 @@ namespace BonelabMultiplayerMockup.Packets.Object
                     return;
                 }
                 SyncedObject.FutureSync(foundCopy, groupId, userId);
-                if (DiscordIntegration.isHost)
-                {
-                    var joinCatchupData = new JoinCatchupData
-                    {
-                        lastId = SyncedObject.lastId,
-                        lastGroupId = SyncedObject.lastGroupId
-                    };
-                    var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.IdCatchupPacket, joinCatchupData);
-                    Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, catchupBuff.getBytes());
-                }
             }
             else
             {

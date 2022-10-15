@@ -38,10 +38,14 @@ namespace BonelabMultiplayerMockup.Packets.Gun
                 gun.Charge();
 
                 magSynced.DestroySyncable(false);
-                if (magSynced.mainReference)
+                if (magSynced.spawnedObject)
                 {
-                    GameObject.Destroy(magSynced.mainReference);
-                    magSynced.mainReference = null;
+                    Transform parent = magSynced.transform;
+                    while (parent.parent != null)
+                    {
+                        parent = parent.parent;
+                    }
+                    GameObject.Destroy(parent);
                 }
             }
         }

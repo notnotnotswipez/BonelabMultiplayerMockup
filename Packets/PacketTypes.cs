@@ -16,6 +16,7 @@ namespace BonelabMultiplayerMockup.Packets
         MagInsertPacket = 11,
         GroupDestroyPacket = 12,
         AvatarQuestionPacket = 13,
-        SyncResetPacket = 14
+        SyncResetPacket = 14,
+        PlayerColliderPacket = 15
     }
 }

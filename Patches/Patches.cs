@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using BonelabMultiplayerMockup.NetworkData;
 using BonelabMultiplayerMockup.Nodes;
 using BonelabMultiplayerMockup.Object;
 using BonelabMultiplayerMockup.Packets;
@@ -26,7 +27,7 @@ namespace BonelabMultiplayerMockup.Patches
     {
         public static bool shouldIgnoreGrabbing = false;
         public static bool shouldIgnoreGunEvents = false;
-        public static bool shouldIgnoreSpawn = false;
+        public static bool shouldIgnoreAvatarSwitch = false;
     }
 
     public class PatchCoroutines
@@ -34,6 +35,7 @@ namespace BonelabMultiplayerMockup.Patches
         public static IEnumerator WaitForAvatarSwitch()
         {
             yield return new WaitForSecondsRealtime(1f);
+
             var swapAvatarMessageData = new AvatarChangeData()
             {
                 userId = DiscordIntegration.currentUser.Id,
@@ -53,7 +55,7 @@ namespace BonelabMultiplayerMockup.Patches
         {
             yield return new WaitForSecondsRealtime(2);
             SyncedObject syncedObject = SyncedObject.GetSyncedComponent(npc);
-            if (!syncedObject)
+            if (syncedObject == null)
             {
                 SyncedObject.Sync(npc);
             }
@@ -87,22 +89,27 @@ namespace BonelabMultiplayerMockup.Patches
 
     public class Patches
     {
-        [HarmonyPatch(typeof(AIBrain), "OnPostSpawn", typeof(GameObject))]
-        private class AiSpawnPatch
+        [HarmonyPatch(typeof(AssetPoolee), "OnDespawn")]
+        private class PoolDespawnPatch
         {
-            public static void Postfix(AIBrain __instance, GameObject go)
+            public static void Postfix(AssetPoolee __instance)
             {
                 if (DiscordIntegration.hasLobby)
                 {
-                    if (DiscordIntegration.isHost)
+
+                    bool isSyncedAlready = SyncedObject.isSyncedObject(__instance.gameObject);
+
+                    if (isSyncedAlready)
                     {
-                        // Shouldnt matter if the NPC is already synced (Which it should be.) This is a failsafe.
-                        MelonCoroutines.Start(PatchCoroutines.WaitForNPCSync(go));
+                        foreach (SyncedObject syncedObject in SyncedObject.GetAllSyncables(__instance.gameObject)) {
+                            syncedObject.DestroySyncable(false);
+                        }
+                        MelonLogger.Msg("Erased sync data on: "+__instance.gameObject.name);
                     }
                 }
             }
         }
-
+        
         [HarmonyPatch(typeof(AssetPoolee), "OnSpawn")]
         private class PoolPatch
         {
@@ -125,22 +132,14 @@ namespace BonelabMultiplayerMockup.Patches
                     }
                     DebugLogger.Msg("Spawned object via pool: "+__instance.name);
 
+                    bool isSyncedAlready = false;
+
                     if (SyncedObject.isSyncedObject(__instance.gameObject))
                     {
-                        DebugLogger.Error("THIS OBJECT IS ALREADY SYNCED, THIS SHOULD BE REMOVED.");
-                    }
-
-                    List<SyncedObject> syncedObjects = SyncedObject.GetAllSyncables(
-                        __instance.gameObject);
-                    foreach (var synced in syncedObjects)
-                    {
-                        synced.DestroySyncable(true);
+                        isSyncedAlready = true;
+                        DebugLogger.Error("THIS OBJECT IS ALREADY SYNCED, THIS SHOULD BE TRANSFERRED.");
                     }
                     
-                    if (SyncedObject.isSyncedObject(__instance.gameObject))
-                    {
-                        DebugLogger.Error("THIS OBJECT IS NO LONGER SYNCED.");
-                    }
 
                     if (!foundSpawnGun && !DiscordIntegration.isHost && isNPC)
                     {
@@ -156,23 +155,14 @@ namespace BonelabMultiplayerMockup.Patches
                             {
                                 if (foundSpawnGun || isHost)
                                 {
-                                    var syncedObject = SyncedObject.GetSyncedComponent(__instance.gameObject);
-                                    if (syncedObject == null)
-                                        SyncedObject.Sync(__instance.gameObject);
-                                    else
-                                        syncedObject.BroadcastOwnerChange();
-                                    DebugLogger.Msg("Synced NPC: " + __instance.gameObject.name);
+                                    MelonCoroutines.Start(PatchCoroutines.WaitForNPCSync(__instance.gameObject));
                                 }
                             }
                             else
                             {
                                 if (foundSpawnGun)
                                 {
-                                    var syncedObject = SyncedObject.GetSyncedComponent(__instance.gameObject);
-                                    if (syncedObject == null)
-                                        SyncedObject.Sync(__instance.gameObject);
-                                    else
-                                        syncedObject.BroadcastOwnerChange();
+                                    MelonCoroutines.Start(PatchCoroutines.WaitForNPCSync(__instance.gameObject));
                                     DebugLogger.Msg("Synced spawn gun spawned Object: " + __instance.gameObject.name);
                                 }
                             }
@@ -218,6 +208,11 @@ namespace BonelabMultiplayerMockup.Patches
             {
                 if (DiscordIntegration.hasLobby)
                 {
+                    if (PatchVariables.shouldIgnoreAvatarSwitch)
+                    {
+                        return;
+                    }
+
                     DebugLogger.Msg("Swapped Avatar");
                     MelonCoroutines.Start(PatchCoroutines.WaitForAvatarSwitch());
                 }
@@ -231,6 +226,10 @@ namespace BonelabMultiplayerMockup.Patches
             {
                 if (DiscordIntegration.hasLobby)
                 {
+                    if (PatchVariables.shouldIgnoreAvatarSwitch)
+                    {
+                        return;
+                    }
                     DebugLogger.Msg("Switched Avatar");
                     MelonCoroutines.Start(PatchCoroutines.WaitForAvatarSwitch());
                 }

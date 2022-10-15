@@ -1,10 +1,13 @@
+using System;
 using BonelabMultiplayerMockup.Packets;
+using MelonLoader;
 using UnityEngine;
 
 namespace BonelabMultiplayerMockup.NetworkData
 {
     public class CompressedTransform
     {
+	    
         public Vector3 position;
         public Quaternion rotation;
         

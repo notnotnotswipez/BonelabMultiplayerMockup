@@ -46,10 +46,14 @@ namespace BonelabMultiplayerMockup.Packets.Object
                 {
                     syncedObject.UpdateObject(new CompressedTransform(new Vector3(0, 100, 0), Quaternion.identity));
                     syncedObject.DestroySyncable(false);
-                    if (syncedObject.mainReference)
+                    if (syncedObject.spawnedObject)
                     {
-                        GameObject.Destroy(syncedObject.mainReference);
-                        syncedObject.mainReference = null;
+                        Transform parent = syncedObject.transform;
+                        while (parent.parent != null)
+                        {
+                            parent = parent.parent;
+                        }
+                        GameObject.Destroy(parent);
                     }
                 }
             }

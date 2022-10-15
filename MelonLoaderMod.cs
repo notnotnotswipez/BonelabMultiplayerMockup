@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
+using AkilliMum.SRP.Mirror;
 using BonelabMultiplayerMockup.NetworkData;
 using BonelabMultiplayerMockup.Nodes;
 using BonelabMultiplayerMockup.Object;
@@ -16,6 +17,7 @@ using BoneLib;
 using MelonLoader;
 using SLZ.Rig;
 using UnityEngine;
+using Avatar = SLZ.VRMK.Avatar;
 
 namespace BonelabMultiplayerMockup
 {
@@ -32,19 +34,58 @@ namespace BonelabMultiplayerMockup
     {
         public static PlayerRepresentation debugRep = null;
         public static Dictionary<byte, GameObject> boneDictionary = new Dictionary<byte, GameObject>();
+        public static Dictionary<byte, GameObject> colliderDictionary = new Dictionary<byte, GameObject>();
         private static byte currentBoneId = 0;
+        private static byte currentColliderId = 0;
         private int updateCount = 0;
         private int desiredFrames = 2;
         public static string sceneName = "";
-        public static bool debug = false;
-        
+
 
         public static void PopulateCurrentAvatarData()
         {
             boneDictionary.Clear();
             currentBoneId = 0;
+            
             PopulateBoneDictionary(Player.GetRigManager().GetComponentInChildren<RigManager>().avatar.gameObject.transform);
+            PopulateCurrentColliderData();
         }
+
+        public static void PopulateCurrentColliderData()
+        {
+            colliderDictionary.Clear();
+            currentColliderId = 0;
+            foreach (var collider in Player.GetPhysicsRig().GetComponentsInChildren<MeshCollider>())
+            {
+                if (collider.isTrigger)
+                {
+                    continue;
+                }
+
+                colliderDictionary.Add(currentColliderId++, collider.gameObject);
+            }
+
+            foreach (var collider in Player.GetPhysicsRig().GetComponentsInChildren<BoxCollider>())
+            {
+                if (collider.isTrigger)
+                {
+                    continue;
+                }
+
+                colliderDictionary.Add(currentColliderId++, collider.gameObject);
+            }
+
+            foreach (var collider in Player.GetPhysicsRig().GetComponentsInChildren<CapsuleCollider>())
+            {
+                if (collider.isTrigger)
+                {
+                    continue;
+                }
+                colliderDictionary.Add(currentColliderId++, collider.gameObject);
+            }
+        }
+
+
 
         private static void PopulateBoneDictionary(Transform parent)
         {
@@ -101,15 +142,6 @@ namespace BonelabMultiplayerMockup
                             Node.activeNode.BroadcastMessage((byte)NetworkChannel.Transaction ,packetByteBuf.getBytes());
                         
                             SyncedObject.CleanData(true);
-                        
-                            if (BoneLib.Player.GetObjectInHand(BoneLib.Player.leftHand) != null)
-                            {
-                                SyncedObject.Sync(BoneLib.Player.GetObjectInHand(BoneLib.Player.leftHand));
-                            }
-                            if (BoneLib.Player.GetObjectInHand(BoneLib.Player.rightHand) != null)
-                            {
-                                SyncedObject.Sync(BoneLib.Player.GetObjectInHand(BoneLib.Player.rightHand));
-                            }
                         }
                     }
                 }
@@ -128,7 +160,7 @@ namespace BonelabMultiplayerMockup
                 MelonLogger.Msg("Server shutdown!");
                 Server.instance.Shutdown();
             }
-            
+
             if (Input.GetKey(KeyCode.O))
             {
                 if (DiscordIntegration.hasLobby)
@@ -154,6 +186,7 @@ namespace BonelabMultiplayerMockup
                 if (DiscordIntegration.hasLobby)
                 {
                     SendBones();
+                    SendColliders();
                     SyncedObject.UpdateSyncedNPCs();
                 }
 
@@ -212,7 +245,6 @@ namespace BonelabMultiplayerMockup
 
         private static void SendBones()
         {
-            
             for (byte i = 0; i < boneDictionary.Count; i++)
             {
                 GameObject bone = boneDictionary[i];
@@ -233,6 +265,32 @@ namespace BonelabMultiplayerMockup
                 };
 
                 PacketByteBuf message = PacketHandler.CompressMessage(NetworkMessageType.PlayerUpdatePacket, playerBoneData);
+                Node.activeNode.BroadcastMessage((byte)NetworkChannel.Unreliable, message.getBytes());
+            }
+        }
+        
+        private static void SendColliders()
+        {
+            for (byte i = 0; i < colliderDictionary.Count; i++)
+            {
+                GameObject collider = colliderDictionary[i];
+                if (collider == null)
+                {
+                    // Assume its all wrong
+                    break;
+                }
+
+                var simplifiedTransform = new CompressedTransform(collider.transform.position,
+                    Quaternion.Euler(collider.transform.eulerAngles));
+
+                PlayerColliderData playerColliderData = new PlayerColliderData()
+                {
+                    userId = DiscordIntegration.currentUser.Id,
+                    colliderIndex = i,
+                    CompressedTransform = simplifiedTransform
+                };
+
+                PacketByteBuf message = PacketHandler.CompressMessage(NetworkMessageType.PlayerColliderPacket, playerColliderData);
                 Node.activeNode.BroadcastMessage((byte)NetworkChannel.Unreliable, message.getBytes());
             }
         }

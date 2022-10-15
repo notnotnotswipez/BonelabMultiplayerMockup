@@ -29,6 +29,11 @@ namespace BonelabMultiplayerMockup.Packets.Player
             var boneId = packetByteBuf.ReadByte();
             var simplifiedTransform = packetByteBuf.ReadCompressedTransform();
 
+            if (simplifiedTransform == null)
+            {
+                return;
+            }
+
             if (PlayerRepresentation.representations.ContainsKey(userId))
             {
                 var playerRepresentation = PlayerRepresentation.representations[userId];

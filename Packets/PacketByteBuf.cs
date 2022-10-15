@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using BonelabMultiplayerMockup.NetworkData;
+using MelonLoader;
 
 namespace BonelabMultiplayerMockup.Packets
 {
@@ -38,13 +39,20 @@ namespace BonelabMultiplayerMockup.Packets
 
         public CompressedTransform ReadCompressedTransform()
         {
-            var transformBytes = new List<byte>();
-            var finalIndex = byteIndex + CompressedTransform.length;
-            for (var i = byteIndex; i < finalIndex; i++) transformBytes.Add(getBytes()[i]);
-            var compressedTransform = new CompressedTransform(transformBytes.ToArray());
-            byteIndex += CompressedTransform.length;
+            try
+            {
+                var transformBytes = new List<byte>();
+                var finalIndex = byteIndex + CompressedTransform.length;
+                for (var i = byteIndex; i < finalIndex; i++) transformBytes.Add(getBytes()[i]);
+                var compressedTransform = new CompressedTransform(transformBytes.ToArray());
+                byteIndex += CompressedTransform.length;
 
-            return compressedTransform;
+                return compressedTransform;
+            }
+            catch
+            {
+                return null;
+            }
         }
         
         public void WriteCompressedTransform(CompressedTransform compressedTransform)

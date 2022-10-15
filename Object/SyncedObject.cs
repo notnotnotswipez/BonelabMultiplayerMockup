@@ -32,7 +32,7 @@ namespace BonelabMultiplayerMockup.Object
         public static ushort lastId;
         public static ushort lastGroupId;
         private Rigidbody _rigidbody;
-        public GameObject mainReference;
+        public bool spawnedObject;
 
         public Vector3 lastPosition;
         public Quaternion lastRotation;
@@ -131,6 +131,20 @@ namespace BonelabMultiplayerMockup.Object
         {
             syncedObjectIds.Remove(currentId);
             syncedObjects.Remove(gameObject);
+
+            if (!totalRemovedGroups.Contains(groupId))
+            {
+                totalRemovedGroups.Add(groupId);
+                GroupDestroyData groupDestroyData = new GroupDestroyData()
+                {
+                    groupId = groupId,
+                    backupObjectId = lastId
+                };
+
+                PacketByteBuf message = PacketHandler.CompressMessage(NetworkMessageType.GroupDestroyPacket, groupDestroyData);
+                Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, message.getBytes());
+            }
+
             if (fullyRemoveList)
             {
                 relatedSyncedObjects[groupId] = new List<SyncedObject>();
@@ -298,9 +312,14 @@ namespace BonelabMultiplayerMockup.Object
                             if (!syncedObject.IsClientSimulated())
                             {
                                 // Means it was spawned in (was NOT in the map)
-                                if (syncedObject.mainReference != null)
+                                if (syncedObject.spawnedObject)
                                 {
-                                    Destroy(syncedObject.mainReference);
+                                    Transform parent = syncedObject.transform;
+                                    while (parent.parent != null)
+                                    {
+                                        parent = parent.parent;
+                                    }
+                                    Destroy(parent);
                                     continue;
                                 }
                             }
