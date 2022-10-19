@@ -49,25 +49,23 @@ namespace BonelabMultiplayerMockup.Packets.Gun
             SyncedObject syncedObject = SyncedObject.GetSyncedObject(objectId);
             if (syncedObject != null)
             {
-                MelonLogger.Msg("Got gun with state "+state);
+                DebugLogger.Msg("Got gun with state "+state);
                 SLZ.Props.Weapons.Gun gun =
                     PoolManager.GetComponentOnObject<SLZ.Props.Weapons.Gun>(syncedObject.gameObject);
                 if (gun != null)
                 {
                     AmmoSocket ammoSocket = PoolManager.GetComponentOnObject<AmmoSocket>(syncedObject.gameObject);
-                    PatchVariables.shouldIgnoreGunEvents = true;
-                    MelonLogger.Msg("Sent state: "+state);
                     if (state == 0)
                     {
                         if (ammoSocket.hasMagazine)
                         {
-                            GameObject.Destroy(ammoSocket._magazinePlug.magazine.gameObject);
+                            ammoSocket.EjectMagazine();
                         }
 
                         gun.InstantLoad();
                         gun.CeaseFire();
                         gun.Charge();
-                        MelonCoroutines.Start(ShootGun(gun));
+                        gun.Fire();
                     }
                     else if (state == 1)
                     {
@@ -81,7 +79,7 @@ namespace BonelabMultiplayerMockup.Packets.Gun
                         }
                     }
 
-                    MelonCoroutines.Start(IgnoreGunReference());
+                    //MelonCoroutines.Start(IgnoreGunReference());
                 }
             }
         }

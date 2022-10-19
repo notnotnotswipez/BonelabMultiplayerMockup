@@ -14,9 +14,7 @@ namespace BonelabMultiplayerMockup.NetworkData
         private const float FLOAT_PRECISION_MULT = 32767f;
         private PacketByteBuf _packetByteBuf = null;
         public static int length = 19;
-        
-        // Dont know if this works yet.
-        
+
         public CompressedTransform(byte[] bytes)
         {
 	        PacketByteBuf packetByteBuf = new PacketByteBuf(bytes);

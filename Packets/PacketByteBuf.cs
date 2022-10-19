@@ -43,9 +43,18 @@ namespace BonelabMultiplayerMockup.Packets
             {
                 var transformBytes = new List<byte>();
                 var finalIndex = byteIndex + CompressedTransform.length;
-                for (var i = byteIndex; i < finalIndex; i++) transformBytes.Add(getBytes()[i]);
+                int times = 0;
+                for (var i = byteIndex; i < finalIndex; i++)
+                {
+                    if (i >= bytes.Length)
+                    {
+                        break;
+                    }
+                    transformBytes.Add(getBytes()[i]);
+                    times++;
+                }
                 var compressedTransform = new CompressedTransform(transformBytes.ToArray());
-                byteIndex += CompressedTransform.length;
+                byteIndex += times;
 
                 return compressedTransform;
             }

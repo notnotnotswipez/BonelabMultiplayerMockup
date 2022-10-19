@@ -5,6 +5,8 @@ namespace BonelabMultiplayerMockup.Utils
         public static bool isBlacklisted(string path)
         {
             if (path.Contains("[RigManager (Blank)]")) return true;
+            if (path.ToLower().StartsWith("playerrep")) return true;
+            if (path.ToLower().StartsWith("cartridge")) return true;
 
             return false;
         }

@@ -44,7 +44,7 @@ namespace BonelabMultiplayerMockup.Object
         public bool isNpc = false;
         public static Dictionary<ushort, Rigidbody> npcWithRoots = new Dictionary<ushort, Rigidbody>();
         public static List<ushort> npcGroupIdsToSync = new List<ushort>();
-        
+
         // Sync nearest <maxNpcsToSync> NPCs and thats all. The specific NPCs which are synced are the ones closest. Good for performance.
         private static int maxNpcsToSync = 3;
 
@@ -58,7 +58,7 @@ namespace BonelabMultiplayerMockup.Object
             isNpc = aiBrain != null;
             if (isNpc)
             {
-                
+
                 if (!npcWithRoots.ContainsKey(groupId))
                 {
                     Rigidbody positional = aiBrain.gameObject.GetComponentInChildren<Rigidbody>();
@@ -72,6 +72,24 @@ namespace BonelabMultiplayerMockup.Object
             }
 
             _rigidbody = gameObject.GetComponent<Rigidbody>();
+
+            if (IsClientSimulated())
+            {
+                var compressedTransform =
+                    new CompressedTransform(gameObject.transform.position,
+                        Quaternion.Euler(gameObject.transform.eulerAngles));
+
+                var transformUpdateData = new TransformUpdateData
+                {
+                    objectId = currentId,
+                    userId = DiscordIntegration.currentUser.Id,
+                    compressedTransform = compressedTransform
+                };
+
+                var packetByteBuf =
+                    PacketHandler.CompressMessage(NetworkMessageType.TransformUpdatePacket, transformUpdateData);
+                Node.activeNode.BroadcastMessage((byte)NetworkChannel.Unreliable, packetByteBuf.getBytes());
+            }
         }
 
         public static void UpdateSyncedNPCs()
@@ -102,6 +120,7 @@ namespace BonelabMultiplayerMockup.Object
                 {
                     break;
                 }
+
                 Vector3 result = GetClosestInList(vectorsToCheck, playerHead);
                 vectorsToCheck.Remove(result);
                 finalGroupIds.Add(groupIdsFlipped[result]);
@@ -141,7 +160,8 @@ namespace BonelabMultiplayerMockup.Object
                     backupObjectId = lastId
                 };
 
-                PacketByteBuf message = PacketHandler.CompressMessage(NetworkMessageType.GroupDestroyPacket, groupDestroyData);
+                PacketByteBuf message =
+                    PacketHandler.CompressMessage(NetworkMessageType.GroupDestroyPacket, groupDestroyData);
                 Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, message.getBytes());
             }
 
@@ -162,13 +182,16 @@ namespace BonelabMultiplayerMockup.Object
         public static List<SyncedObject> GetAllSyncables(GameObject gameObject)
         {
             List<SyncedObject> syncedObjects = new List<SyncedObject>();
-            foreach (SyncedObject syncedObject in gameObject.GetComponentsInChildren<SyncedObject>()) {
+            foreach (SyncedObject syncedObject in gameObject.GetComponentsInChildren<SyncedObject>())
+            {
                 if (syncedObjects.Contains(syncedObject))
                 {
                     syncedObjects.Add(syncedObject);
                 }
             }
-            foreach (SyncedObject syncedObject in gameObject.GetComponentsInParent<SyncedObject>()) {
+
+            foreach (SyncedObject syncedObject in gameObject.GetComponentsInParent<SyncedObject>())
+            {
                 if (syncedObjects.Contains(syncedObject))
                 {
                     syncedObjects.Add(syncedObject);
@@ -204,6 +227,7 @@ namespace BonelabMultiplayerMockup.Object
                         queuedObjectsToDelete.Add(groupId);
                         totalRemovedGroups.Add(groupId);
                     }
+
                     return;
                 }
             }
@@ -262,7 +286,8 @@ namespace BonelabMultiplayerMockup.Object
 
         public static void FutureSync(GameObject gameObject, ushort groupId, long userId)
         {
-            foreach (Rigidbody rigidbody in GetProperRigidBodies(gameObject.transform)) {
+            foreach (Rigidbody rigidbody in GetProperRigidBodies(gameObject.transform))
+            {
                 GameObject npcObj = rigidbody.gameObject;
                 FutureProofSync(npcObj, groupId, userId);
             }
@@ -319,12 +344,13 @@ namespace BonelabMultiplayerMockup.Object
                                     {
                                         parent = parent.parent;
                                     }
+
                                     Destroy(parent);
                                     continue;
                                 }
                             }
                         }
-                    
+
                         Destroy(syncedObject);
                     }
                 }
@@ -344,10 +370,12 @@ namespace BonelabMultiplayerMockup.Object
             {
                 return gameObject.GetComponent<SyncedObject>();
             }
+
             if (gameObject.GetComponentInParent<SyncedObject>())
             {
                 return gameObject.GetComponentInParent<SyncedObject>();
             }
+
             if (gameObject.GetComponentInChildren<SyncedObject>())
             {
                 return gameObject.GetComponentInChildren<SyncedObject>();
@@ -400,9 +428,9 @@ namespace BonelabMultiplayerMockup.Object
             syncedObject.SetOwner(ownerId);
             syncedObject.currentId = objectId;
             syncedObject.groupId = groupId;
-            
-            
-            
+
+
+
             DebugLogger.Msg("Made sync object for: " + gameObject.name + ", with an ID of: " + objectId +
                             ", and group ID of: " + groupId);
             DebugLogger.Msg("Owner: " + ownerId);
@@ -520,7 +548,7 @@ namespace BonelabMultiplayerMockup.Object
             syncedObjects.Add(gameObject);
             if (!syncedObjectIds.ContainsKey(syncedId)) syncedObjectIds.Add(syncedId, syncedObject);
         }
-        
+
         public static void ManualClientSync(GameObject gameObject, ushort groupId, long ownerId, ushort objectId)
         {
             if (gameObject.GetComponent<SyncedObject>())
@@ -679,7 +707,7 @@ namespace BonelabMultiplayerMockup.Object
                 {
                     rigidbodies.Add(rigidbody);
                 }
-                    
+
 
             DebugLogger.Msg("Found: " + rigidbodies.Count + " for object:" + ultimateParent.transform.name);
             return rigidbodies.ToArray();
@@ -710,10 +738,12 @@ namespace BonelabMultiplayerMockup.Object
                 {
                     return true;
                 }
+
                 return false;
             }
 
-            return (transform.position - lastPosition).sqrMagnitude > 0.0005f || Quaternion.Angle(transform.rotation, lastRotation) > 0.05f;
+            return (transform.position - lastPosition).sqrMagnitude > 0.0005f ||
+                   Quaternion.Angle(transform.rotation, lastRotation) > 0.05f;
         }
 
         private static string GetGameObjectPath(GameObject obj)
@@ -739,7 +769,7 @@ namespace BonelabMultiplayerMockup.Object
             {
                 firstEverOwner = userId;
             }
-            
+
             simulatorId = userId;
             if (IsClientSimulated())
             {
@@ -774,6 +804,7 @@ namespace BonelabMultiplayerMockup.Object
                     {
                         parent = parent.parent;
                     }
+
                     parent.gameObject.SetActive(true);
                 }
 

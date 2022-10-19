@@ -26,7 +26,7 @@ namespace BonelabMultiplayerMockup
         public const string Name = "BonelabMultiplayerMockup"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "notnotnotswipez"; // Author of the Mod.  (Set as null if none)
         public const string Company = null; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "1.0.0"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "2.0.0"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = null; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -155,12 +155,6 @@ namespace BonelabMultiplayerMockup
                 Server.StartServer();
             }
 
-            if (Input.GetKey(KeyCode.P))
-            {
-                MelonLogger.Msg("Server shutdown!");
-                Server.instance.Shutdown();
-            }
-
             if (Input.GetKey(KeyCode.O))
             {
                 if (DiscordIntegration.hasLobby)
@@ -196,10 +190,9 @@ namespace BonelabMultiplayerMockup
 
         public override void OnFixedUpdate()
         {
-
+            
             if (DiscordIntegration.hasLobby)
             {
-                
                 if (SyncedObject.syncedObjectIds.Count > 0)
                 {
                     foreach (SyncedObject syncedObject in SyncedObject.syncedObjectIds.Values) {

@@ -89,6 +89,31 @@ namespace BonelabMultiplayerMockup.Patches
 
     public class Patches
     {
+        [HarmonyPatch(typeof(AIBrain), "OnResurrection")]
+        private class AiResurrectionPatch
+        {
+            public static void Postfix(AIBrain __instance)
+            {
+                if (DiscordIntegration.hasLobby)
+                {
+
+                    if (DiscordIntegration.isHost)
+                    {
+                        bool isSyncedAlready = SyncedObject.isSyncedObject(__instance.gameObject);
+
+                        if (isSyncedAlready)
+                        {
+                            foreach (SyncedObject syncedObject in SyncedObject.GetAllSyncables(__instance.gameObject)) {
+                                syncedObject.DestroySyncable(false);
+                            }
+                            MelonLogger.Msg("Erased sync data on: "+__instance.gameObject.name);
+                        }
+                        SyncedObject.Sync(__instance.gameObject);
+                    }
+                }
+            }
+        }
+        
         [HarmonyPatch(typeof(AssetPoolee), "OnDespawn")]
         private class PoolDespawnPatch
         {
@@ -179,23 +204,41 @@ namespace BonelabMultiplayerMockup.Patches
             {
                 if (DiscordIntegration.hasLobby)
                 {
-                    if (PatchVariables.shouldIgnoreGunEvents)
-                    {
-                        return;
-                    }
 
-                    DebugLogger.Msg("Gun fired");
-                    SyncedObject syncedObject = SyncedObject.GetSyncedComponent(__instance.gameObject);
-                    if (syncedObject)
+                    bool isMine = false;
+                    /*if (Player.GetComponentInHand<Gun>(Player.leftHand))
                     {
-                        var gunStateMessageData = new GunStateData()
+                        Gun gun = Player.GetComponentInHand<Gun>(Player.leftHand);
+                        if (gun == __instance)
                         {
-                            objectid = syncedObject.currentId,
-                            state = 0
-                        };
-                        var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.GunStatePacket,
-                            gunStateMessageData);
-                        Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, packetByteBuf.getBytes());
+                            isMine = true;
+                        }
+                    }
+                    if (Player.GetComponentInHand<Gun>(Player.rightHand))
+                    {
+                        Gun gun = Player.GetComponentInHand<Gun>(Player.rightHand);
+                        if (gun == __instance)
+                        {
+                            isMine = true;
+                        }
+                    }*/
+                    
+                    SyncedObject gunSynced = SyncedObject.GetSyncedComponent(__instance.gameObject);
+
+                    if (gunSynced)
+                    {
+                        if (gunSynced.IsClientSimulated())
+                        {
+                            DebugLogger.Msg("Gun fired");
+                            var gunStateMessageData = new GunStateData()
+                            {
+                                objectid = gunSynced.currentId,
+                                state = 0
+                            };
+                            var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.GunStatePacket,
+                                gunStateMessageData);
+                            Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, packetByteBuf.getBytes());
+                        }
                     }
                 }
             }

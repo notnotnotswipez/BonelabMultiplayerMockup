@@ -1,7 +1,9 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using BonelabMultiplayerMockup.NetworkData;
 using BonelabMultiplayerMockup.Nodes;
+using BonelabMultiplayerMockup.Object;
 using BonelabMultiplayerMockup.Packets;
 using BonelabMultiplayerMockup.Packets.Player;
 using BonelabMultiplayerMockup.Patches;
@@ -29,6 +31,7 @@ namespace BonelabMultiplayerMockup.Representations
         private byte currentBoneId;
         private byte currentColliderId = 0;
         public GameObject playerRep;
+        public GameObject colliders;
         public User user;
         public string username;
 
@@ -48,9 +51,17 @@ namespace BonelabMultiplayerMockup.Representations
         {
             currentBoneId = 0;
             currentColliderId = 0;
+            foreach (var colliderObject in colliderDictionary.Values) {
+                GameObject.Destroy(colliderObject);
+            }
+
             boneDictionary.Clear();
             colliderDictionary.Clear();
-            if (playerRep != null) UnityEngine.Object.Destroy(playerRep);
+            if (playerRep != null)
+            {
+                UnityEngine.Object.Destroy(colliders);
+                UnityEngine.Object.Destroy(playerRep);
+            }
 
             AssetsManager.LoadAvatar(barcode, FinalizeAvatar);
         }
@@ -65,7 +76,14 @@ namespace BonelabMultiplayerMockup.Representations
             AssetsManager.LoadAvatar(originalBarcode, o =>
             {
                 GameObject spawned = GameObject.Instantiate(o);
-                rigManager.SwitchAvatar(spawned.GetComponent<Avatar>());
+                Avatar avatar = spawned.GetComponent<Avatar>();
+                foreach (var skinnedMesh in avatar.headMeshes)
+                {
+                    skinnedMesh.enabled = false;
+                }
+
+                spawned.transform.parent = rigManager.gameObject.transform;
+                rigManager.SwitchAvatar(avatar);
             });
             yield return new WaitForSecondsRealtime(3f);
             PatchVariables.shouldIgnoreAvatarSwitch = false;
@@ -77,6 +95,7 @@ namespace BonelabMultiplayerMockup.Representations
             string original = Player.GetRigManager().GetComponentInChildren<RigManager>()._avatarCrate._barcode._id;
             if (playerRep != null)
             {
+                GameObject.Destroy(colliders);
                 GameObject.Destroy(playerRep);
                 GameObject backupCopy = GameObject.Instantiate(go);
                 backupCopy.name = "(PlayerRep) " + username;
@@ -114,7 +133,13 @@ namespace BonelabMultiplayerMockup.Representations
 
         private void PopulateColliderDictionary()
         {
+            if(colliders != null)
+            {
+                GameObject.Destroy(colliders);
+            }
+
             GameObject colliderParent = new GameObject("allColliders");
+            colliders = colliderParent;
 
             foreach (var collider in Player.GetPhysicsRig().GetComponentsInChildren<MeshCollider>())
             {
@@ -134,8 +159,22 @@ namespace BonelabMultiplayerMockup.Representations
 
                 Rigidbody rigidbody = gameObject.AddComponent<Rigidbody>();
                 rigidbody.isKinematic = true;
-                GenericGrip genericGrip = gameObject.AddComponent<GenericGrip>();
-                genericGrip._targetColliders.Add(meshCollider);
+                     
+                GenericGrip genericGripOriginal = gameObject.GetComponent<GenericGrip>();
+                if (genericGripOriginal)
+                {
+                    GenericGrip genericGrip = gameObject.AddComponent<GenericGrip>();
+                    genericGrip._isEnabled = true;
+                    genericGrip.maxBreakForce = Single.PositiveInfinity;
+                    genericGrip.minBreakForce = Single.PositiveInfinity;
+                    genericGrip.radius = genericGripOriginal.radius;
+                    genericGrip.priority = genericGripOriginal.priority;
+                    genericGrip.gripOptions = genericGripOriginal.gripOptions;
+                    genericGrip.SetupConfiguration(genericGripOriginal._handJointConfig);
+                    genericGrip._targetColliders.Add(meshCollider);
+                    genericGrip.gripOptions = InteractionOptions.MultipleHands;
+                }
+
                 colliderDictionary.Add(currentColliderId++, gameObject);
             }
 
@@ -153,8 +192,21 @@ namespace BonelabMultiplayerMockup.Representations
                 gameObject.transform.parent = colliderParent.transform;
                 Rigidbody rigidbody = gameObject.AddComponent<Rigidbody>();
                 rigidbody.isKinematic = true;
-                GenericGrip genericGrip = gameObject.AddComponent<GenericGrip>();
-                genericGrip._targetColliders.Add(boxCollider);
+                
+                GenericGrip genericGripOriginal = gameObject.GetComponent<GenericGrip>();
+                if (genericGripOriginal)
+                {
+                    GenericGrip genericGrip = gameObject.AddComponent<GenericGrip>();
+                    genericGrip._isEnabled = true;
+                    genericGrip.maxBreakForce = Single.PositiveInfinity;
+                    genericGrip.minBreakForce = Single.PositiveInfinity;
+                    genericGrip.radius = genericGripOriginal.radius;
+                    genericGrip.priority = genericGripOriginal.priority;
+                    genericGrip.gripOptions = genericGripOriginal.gripOptions;
+                    genericGrip.SetupConfiguration(genericGripOriginal._handJointConfig);
+                    genericGrip._targetColliders.Add(boxCollider);
+                    genericGrip.gripOptions = InteractionOptions.MultipleHands;
+                }
                 colliderDictionary.Add(currentColliderId++, gameObject);
             }
 
@@ -166,6 +218,7 @@ namespace BonelabMultiplayerMockup.Representations
                 }
 
                 GameObject gameObject = new GameObject("collider" + currentColliderId);
+                
                 CapsuleCollider capsuleCollider = gameObject.AddComponent<CapsuleCollider>();
                 capsuleCollider.center = collider.center;
                 capsuleCollider.direction = collider.direction;
@@ -174,8 +227,22 @@ namespace BonelabMultiplayerMockup.Representations
                 gameObject.transform.parent = colliderParent.transform;
                 Rigidbody rigidbody = gameObject.AddComponent<Rigidbody>();
                 rigidbody.isKinematic = true;
-                GenericGrip genericGrip = gameObject.AddComponent<GenericGrip>();
-                genericGrip._targetColliders.Add(capsuleCollider);
+                
+                GenericGrip genericGripOriginal = gameObject.GetComponent<GenericGrip>();
+                if (genericGripOriginal)
+                {
+                    GenericGrip genericGrip = gameObject.AddComponent<GenericGrip>();
+                    genericGrip._isEnabled = true;
+                    genericGrip.maxBreakForce = Single.PositiveInfinity;
+                    genericGrip.minBreakForce = Single.PositiveInfinity;
+                    genericGrip.radius = genericGripOriginal.radius;
+                    genericGrip.priority = genericGripOriginal.priority;
+                    genericGrip.gripOptions = genericGripOriginal.gripOptions;
+                    genericGrip.SetupConfiguration(genericGripOriginal._handJointConfig);
+                    genericGrip._targetColliders.Add(capsuleCollider);
+                    genericGrip.gripOptions = InteractionOptions.MultipleHands;
+                }
+
                 colliderDictionary.Add(currentColliderId++, gameObject);
             }
 
@@ -197,11 +264,11 @@ namespace BonelabMultiplayerMockup.Representations
                 if (selectedBone != null)
                 {
                     selectedBone.transform.position = compressedTransform.position;
-                    selectedBone.transform.eulerAngles = compressedTransform.rotation.eulerAngles;
+                    selectedBone.transform.rotation = compressedTransform.rotation;
                 }
             }
         }
-        
+
         public void updateColliderTransform(byte colliderId, CompressedTransform compressedTransform)
         {
             if (playerRep == null) return;
