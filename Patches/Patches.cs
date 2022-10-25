@@ -5,6 +5,7 @@ using BonelabMultiplayerMockup.Nodes;
 using BonelabMultiplayerMockup.Object;
 using BonelabMultiplayerMockup.Packets;
 using BonelabMultiplayerMockup.Packets.Gun;
+using BonelabMultiplayerMockup.Packets.Object;
 using BonelabMultiplayerMockup.Packets.Player;
 using BonelabMultiplayerMockup.Utils;
 using BoneLib;
@@ -19,6 +20,7 @@ using SLZ.Props.Weapons;
 using SLZ.Rig;
 using SLZ.Zones;
 using UnityEngine;
+using UnityEngine.Events;
 using Avatar = SLZ.VRMK.Avatar;
 
 namespace BonelabMultiplayerMockup.Patches
@@ -63,7 +65,6 @@ namespace BonelabMultiplayerMockup.Patches
             {
                 syncedObject.BroadcastOwnerChange();
             }
-
         }
 
         public static IEnumerator WaitForAttachSync(GameObject toSync)
@@ -81,14 +82,40 @@ namespace BonelabMultiplayerMockup.Patches
                 SyncedObject.Sync(toSync);
             else
                 syncedObject.BroadcastOwnerChange();
+            
             PatchVariables.shouldIgnoreGrabbing = false;
         }
-        
-        
     }
 
     public class Patches
     {
+        
+        [HarmonyPatch(typeof(AIBrain), "OnDeath")]
+        private class AiDeathPatch
+        {
+            public static void Postfix(AIBrain __instance)
+            {
+                if (DiscordIntegration.hasLobby)
+                {
+                    SyncedObject syncedObject = SyncedObject.GetSyncedComponent(__instance.gameObject);
+
+                    if (syncedObject)
+                    {
+                        if (syncedObject.IsClientSimulated())
+                        {
+                            var npcDeathData = new NpcDeathData()
+                            {
+                                npcId = syncedObject.currentId
+                            };
+                            var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.NpcDeathPacket,
+                                npcDeathData);
+                            Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, packetByteBuf.getBytes());
+                        }
+                    }
+                }
+            }
+        }
+        
         [HarmonyPatch(typeof(AIBrain), "OnResurrection")]
         private class AiResurrectionPatch
         {
@@ -204,25 +231,6 @@ namespace BonelabMultiplayerMockup.Patches
             {
                 if (DiscordIntegration.hasLobby)
                 {
-
-                    bool isMine = false;
-                    /*if (Player.GetComponentInHand<Gun>(Player.leftHand))
-                    {
-                        Gun gun = Player.GetComponentInHand<Gun>(Player.leftHand);
-                        if (gun == __instance)
-                        {
-                            isMine = true;
-                        }
-                    }
-                    if (Player.GetComponentInHand<Gun>(Player.rightHand))
-                    {
-                        Gun gun = Player.GetComponentInHand<Gun>(Player.rightHand);
-                        if (gun == __instance)
-                        {
-                            isMine = true;
-                        }
-                    }*/
-                    
                     SyncedObject gunSynced = SyncedObject.GetSyncedComponent(__instance.gameObject);
 
                     if (gunSynced)

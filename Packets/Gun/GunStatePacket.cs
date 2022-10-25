@@ -59,10 +59,13 @@ namespace BonelabMultiplayerMockup.Packets.Gun
                     {
                         if (ammoSocket.hasMagazine)
                         {
-                            ammoSocket.EjectMagazine();
+                            ammoSocket._magazinePlug.magazine.magazineState.Refill();
                         }
-
-                        gun.InstantLoad();
+                        else
+                        {
+                            gun.InstantLoad(); 
+                        }
+                        
                         gun.CeaseFire();
                         gun.Charge();
                         gun.Fire();

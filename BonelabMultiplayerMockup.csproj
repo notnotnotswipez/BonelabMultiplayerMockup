@@ -407,7 +407,9 @@
         <Compile Include="Packets\Gun\MagInsertPacket.cs" />
         <Compile Include="Packets\Object\GroupDestroyPacket.cs" />
         <Compile Include="Packets\Object\InitializeSyncPacket.cs" />
+        <Compile Include="Packets\Object\NpcDeathPacket.cs" />
         <Compile Include="Packets\Object\OwnerChangePacket.cs" />
+        <Compile Include="Packets\Object\SimpleGripEventPacket.cs" />
         <Compile Include="Packets\Object\TransformUpdatePacket.cs" />
         <Compile Include="Packets\PacketHandler.cs" />
         <Compile Include="Packets\NetworkPacket.cs" />
@@ -421,7 +423,9 @@
         <Compile Include="Packets\Player\PlayerBonePacket.cs" />
         <Compile Include="Packets\Player\PlayerColliderPacket.cs" />
         <Compile Include="Packets\Player\RequestIdsPacket.cs" />
+        <Compile Include="Packets\Player\SceneChangePacket.cs" />
         <Compile Include="Packets\Player\ShortIdPacket.cs" />
+        <Compile Include="Packets\Reset\LoadedLevelResponsePacket.cs" />
         <Compile Include="Packets\Reset\SyncResetPacket.cs" />
         <Compile Include="Patches\Patches.cs" />
         <Compile Include="Properties\AssemblyInfo.cs" />

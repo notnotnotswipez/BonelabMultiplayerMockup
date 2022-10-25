@@ -8,6 +8,7 @@ using BonelabMultiplayerMockup.Packets;
 using BonelabMultiplayerMockup.Packets.Object;
 using BonelabMultiplayerMockup.Utils;
 using BoneLib;
+using Il2CppSystem.Numerics;
 using MelonLoader;
 using SLZ.AI;
 using SLZ.Marrow.Pool;
@@ -43,7 +44,10 @@ namespace BonelabMultiplayerMockup.Object
 
         public bool isNpc = false;
         public static Dictionary<ushort, Rigidbody> npcWithRoots = new Dictionary<ushort, Rigidbody>();
+        public Dictionary<SimpleGripEvents, byte> gripEvents = new Dictionary<SimpleGripEvents, byte>();
         public static List<ushort> npcGroupIdsToSync = new List<ushort>();
+
+        private bool hasUpdatedBefore = false;
 
         // Sync nearest <maxNpcsToSync> NPCs and thats all. The specific NPCs which are synced are the ones closest. Good for performance.
         private static int maxNpcsToSync = 3;
@@ -90,6 +94,75 @@ namespace BonelabMultiplayerMockup.Object
                     PacketHandler.CompressMessage(NetworkMessageType.TransformUpdatePacket, transformUpdateData);
                 Node.activeNode.BroadcastMessage((byte)NetworkChannel.Unreliable, packetByteBuf.getBytes());
             }
+            
+            PopulateGripEvents();
+        }
+
+        private void PopulateGripEvents()
+        {
+            SimpleGripEvents highestGripEvent = PoolManager.GetComponentOnObject<SimpleGripEvents>(gameObject);
+            if (highestGripEvent != null)
+            {
+                byte index = 0;
+                foreach (SimpleGripEvents gripEvent in gameObject.GetComponentsInParent<SimpleGripEvents>())
+                {
+                    highestGripEvent = gripEvent;
+                }
+                
+                
+                foreach (var totalGrip in highestGripEvent.GetComponentsInChildren<SimpleGripEvents>())
+                {
+                    MelonLogger.Msg("Indexed grip event at: "+index);
+                    totalGrip.OnIndexDown.AddListener(new Action(() => OnIndexDown(totalGrip)));
+                    totalGrip.OnMenuTapDown.AddListener(new Action(() => OnMenuTapDown(totalGrip)));
+                    gripEvents.Add(totalGrip, index);
+                    DebugLogger.Msg("Indexed grip event: "+index);
+                    index++;
+                }
+            }
+        }
+
+        private void OnIndexDown(SimpleGripEvents gripEvent)
+        {
+            if (!IsClientSimulated())
+            {
+                return;
+            }
+
+            byte gripIndex = gripEvents[gripEvent];
+            var gripEventData = new SimpleGripEventData()
+            {
+                objectId = currentId,
+                gripIndex = gripIndex,
+                eventIndex = 1
+            };
+            
+            MelonLogger.Msg("Sent grip index: "+1+" for: "+gripIndex);
+
+            var packetByteBuf =
+                PacketHandler.CompressMessage(NetworkMessageType.SimpleGripEventPacket, gripEventData);
+            Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, packetByteBuf.getBytes());
+        }
+        
+        private void OnMenuTapDown(SimpleGripEvents gripEvent)
+        {
+            if (!IsClientSimulated())
+            {
+                return;
+            }
+
+            byte gripIndex = gripEvents[gripEvent];
+            var gripEventData = new SimpleGripEventData()
+            {
+                objectId = currentId,
+                gripIndex = gripIndex,
+                eventIndex = 2
+            };
+            MelonLogger.Msg("Sent grip index: "+2+" for: "+gripIndex);
+
+            var packetByteBuf =
+                PacketHandler.CompressMessage(NetworkMessageType.SimpleGripEventPacket, gripEventData);
+            Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, packetByteBuf.getBytes());
         }
 
         public static void UpdateSyncedNPCs()
@@ -810,10 +883,10 @@ namespace BonelabMultiplayerMockup.Object
 
                 if (_rigidbody)
                 {
-                    _rigidbody.velocity = new Vector3(0, 0, 0);
+                    _rigidbody.velocity = Vector3.zero;
                     _rigidbody.isKinematic = true;
                 }
-
+                
                 gameObject.transform.position = compressedTransform.position;
                 gameObject.transform.eulerAngles = compressedTransform.rotation.eulerAngles;
             }

@@ -17,6 +17,10 @@ namespace BonelabMultiplayerMockup.Packets
         GroupDestroyPacket = 12,
         AvatarQuestionPacket = 13,
         SyncResetPacket = 14,
-        PlayerColliderPacket = 15
+        PlayerColliderPacket = 15,
+        NpcDeathPacket = 16,
+        LevelResponsePacket = 17,
+        SceneChangePacket = 18,
+        SimpleGripEventPacket = 19
     }
 }

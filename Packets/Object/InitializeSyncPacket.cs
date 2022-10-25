@@ -44,6 +44,11 @@ namespace BonelabMultiplayerMockup.Packets.Object
                 SyncedObject.lastId = objectId;
             }
 
+            if (SyncedObject.lastGroupId < groupId)
+            {
+                SyncedObject.lastGroupId = groupId;
+            }
+
             if (!SyncedObject.syncedObjectIds.ContainsKey(objectId))
             {
                 var foundCopy = GameObject.Find(objectName);
@@ -58,6 +63,14 @@ namespace BonelabMultiplayerMockup.Packets.Object
                         return;
                     }
                     DebugLogger.Msg("Barcode: " + barcode);
+                    if (!PoolManager.IsCrate(barcode))
+                    {
+                        SyncedObject.lastId = finalId;
+                        SyncedObject.lastGroupId++;
+                        DebugLogger.Error("Requested object was not installed. Corrected group Ids");
+                        return;
+                    }
+
                     PoolManager.SpawnGameObject(barcode, new Vector3(0, 0, 0), Quaternion.identity, o =>
                     {
                         DebugLogger.Msg("Spawned object! "+" "+barcode);
@@ -67,6 +80,8 @@ namespace BonelabMultiplayerMockup.Packets.Object
                         {
                             syncedObjectComponent.spawnedObject = true;
                         }
+                        SyncedObject.lastId = finalId;
+                        SyncedObject.lastGroupId++;
                         DebugLogger.Msg("Ended sync Id at: "+SyncedObject.lastId);
                         DebugLogger.Msg("Ended sync at Group ID: "+SyncedObject.lastGroupId);
                     });
@@ -79,6 +94,8 @@ namespace BonelabMultiplayerMockup.Packets.Object
                     return;
                 }
                 SyncedObject.FutureSync(foundCopy, groupId, userId);
+                SyncedObject.lastId = finalId;
+                SyncedObject.lastGroupId++;
             }
             else
             {

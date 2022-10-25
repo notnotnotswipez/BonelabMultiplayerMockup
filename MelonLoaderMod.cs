@@ -7,6 +7,7 @@ using BonelabMultiplayerMockup.NetworkData;
 using BonelabMultiplayerMockup.Nodes;
 using BonelabMultiplayerMockup.Object;
 using BonelabMultiplayerMockup.Packets;
+using BonelabMultiplayerMockup.Packets.Gun;
 using BonelabMultiplayerMockup.Packets.Object;
 using BonelabMultiplayerMockup.Packets.Player;
 using BonelabMultiplayerMockup.Packets.Reset;
@@ -15,6 +16,8 @@ using BonelabMultiplayerMockup.Representations;
 using BonelabMultiplayerMockup.Utils;
 using BoneLib;
 using MelonLoader;
+using SLZ.Interaction;
+using SLZ.Marrow.SceneStreaming;
 using SLZ.Rig;
 using UnityEngine;
 using Avatar = SLZ.VRMK.Avatar;
@@ -26,7 +29,7 @@ namespace BonelabMultiplayerMockup
         public const string Name = "BonelabMultiplayerMockup"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "notnotnotswipez"; // Author of the Mod.  (Set as null if none)
         public const string Company = null; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "2.0.0"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "3.0.0"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = null; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -40,6 +43,7 @@ namespace BonelabMultiplayerMockup
         private int updateCount = 0;
         private int desiredFrames = 2;
         public static string sceneName = "";
+        public static bool waitingForSceneLoad = false;
 
 
         public static void PopulateCurrentAvatarData()
@@ -62,12 +66,22 @@ namespace BonelabMultiplayerMockup
                     continue;
                 }
 
+                if (collider.GetComponentInParent<SlotContainer>())
+                {
+                    continue;
+                }
+
                 colliderDictionary.Add(currentColliderId++, collider.gameObject);
             }
 
             foreach (var collider in Player.GetPhysicsRig().GetComponentsInChildren<BoxCollider>())
             {
                 if (collider.isTrigger)
+                {
+                    continue;
+                }
+                
+                if (collider.GetComponentInParent<SlotContainer>())
                 {
                     continue;
                 }
@@ -81,6 +95,12 @@ namespace BonelabMultiplayerMockup
                 {
                     continue;
                 }
+                
+                if (collider.GetComponentInParent<SlotContainer>())
+                {
+                    continue;
+                }
+                
                 colliderDictionary.Add(currentColliderId++, collider.gameObject);
             }
         }
@@ -110,10 +130,38 @@ namespace BonelabMultiplayerMockup
             
         }
 
+        private IEnumerator WaitForSceneLoad()
+        {
+            waitingForSceneLoad = true;
+            while (SceneStreamer.Session.Status == StreamStatus.LOADING)
+            {
+                yield return null;
+            }
+            
+            SceneChangeData sceneChangePacket = new SceneChangeData()
+            {
+                barcode = SceneStreamer.Session._level._barcode._id
+            };
+            var sceneBuff = PacketHandler.CompressMessage(NetworkMessageType.LevelResponsePacket, sceneChangePacket);
+            Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, sceneBuff.getBytes());
+            waitingForSceneLoad = false;
+        }
+
         public override void OnSceneWasLoaded(int buildIndex, string sceneName)
         {
             if (DiscordIntegration.hasLobby)
             {
+                if (DiscordIntegration.isHost)
+                {
+                    if (SceneStreamer.Session.Status == StreamStatus.LOADING)
+                    {
+                        if (!waitingForSceneLoad)
+                        {
+                            MelonCoroutines.Start(WaitForSceneLoad());
+                        }
+                    }
+                }
+
                 if (Player.GetRigManager() != null)
                 {
                     
@@ -126,6 +174,10 @@ namespace BonelabMultiplayerMockup
                         PopulateCurrentAvatarData();
                         BonelabMultiplayerMockup.sceneName = rigManager.scene.name;
                         MelonCoroutines.Start(PatchCoroutines.WaitForAvatarSwitch());
+                
+                        // Send packet to the lobby owner saying we loaded into the scene
+                        var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.LevelResponsePacket, new LoadedLevelResponseData());
+                        Node.activeNode.SendMessage(DiscordIntegration.lobby.OwnerId, (byte)NetworkChannel.Reliable, catchupBuff.getBytes());
                     }
                     else
                     {
@@ -153,6 +205,21 @@ namespace BonelabMultiplayerMockup
             if (Input.GetKey(KeyCode.S))
             {
                 Server.StartServer();
+            }
+            
+            if (Input.GetKey(KeyCode.M))
+            {
+                if (DiscordIntegration.hasLobby)
+                {
+                    if (DiscordIntegration.isHost)
+                    {
+                        Server.instance.Shutdown();
+                    }
+                    else
+                    {
+                        Client.instance.Shutdown();
+                    }
+                }
             }
 
             if (Input.GetKey(KeyCode.O))

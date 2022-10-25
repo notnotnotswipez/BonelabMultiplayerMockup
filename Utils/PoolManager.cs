@@ -57,6 +57,18 @@ namespace BonelabMultiplayerMockup.Utils
             return assetPoolee.spawnableCrate._barcode;
         }
 
+        public static bool IsCrate(string barcode)
+        {
+            GameObjectCrate gameObjectCrate =
+                AssetWarehouse.Instance.GetCrate<GameObjectCrate>(barcode);
+            if (gameObjectCrate == null)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
         public static void SpawnGameObject(string barcode, Vector3 position, Quaternion rotation,
             Action<GameObject> onSpawn)
         {
