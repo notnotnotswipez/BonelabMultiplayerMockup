@@ -401,6 +401,7 @@
         <Compile Include="Nodes\Client.cs" />
         <Compile Include="Nodes\Node.cs" />
         <Compile Include="Nodes\Server.cs" />
+        <Compile Include="Object\InterpolatedObject.cs" />
         <Compile Include="Object\SyncedObject.cs" />
         <Compile Include="Packets\DebugAssistance.cs" />
         <Compile Include="Packets\Gun\GunStatePacket.cs" />

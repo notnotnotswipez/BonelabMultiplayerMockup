@@ -30,10 +30,12 @@ namespace BonelabMultiplayerMockup.Representations
         public static Dictionary<long, PlayerRepresentation> representations =
             new Dictionary<long, PlayerRepresentation>();
         
-        public Dictionary<byte, GameObject> boneDictionary = new Dictionary<byte, GameObject>();
-        public Dictionary<byte, GameObject> colliderDictionary = new Dictionary<byte, GameObject>();
+        //public Dictionary<byte, GameObject> boneDictionary = new Dictionary<byte, GameObject>();
+        //public Dictionary<byte, GameObject> colliderDictionary = new Dictionary<byte, GameObject>();
         
-
+        public Dictionary<byte, InterpolatedObject> boneDictionary = new Dictionary<byte, InterpolatedObject>();
+        public Dictionary<byte, InterpolatedObject> colliderDictionary = new Dictionary<byte, InterpolatedObject>();
+        
         private byte currentBoneId;
         private byte currentColliderId = 0;
         public GameObject playerRep;
@@ -71,7 +73,7 @@ namespace BonelabMultiplayerMockup.Representations
             currentBoneId = 0;
             currentColliderId = 0;
             foreach (var colliderObject in colliderDictionary.Values) {
-                GameObject.Destroy(colliderObject);
+                GameObject.Destroy(colliderObject.go);
             }
 
             boneDictionary.Clear();
@@ -83,6 +85,16 @@ namespace BonelabMultiplayerMockup.Representations
             }
 
             AssetsManager.LoadAvatar(barcode, FinalizeAvatar);
+        }
+
+        public void Update()
+        {
+            foreach (InterpolatedObject interpolatedObject in boneDictionary.Values) {
+                interpolatedObject.Lerp();
+            }
+            foreach (InterpolatedObject interpolatedObject in colliderDictionary.Values) {
+                interpolatedObject.Lerp();
+            }
         }
 
         private IEnumerator FinalizeColliders(string originalBarcode)
@@ -144,7 +156,7 @@ namespace BonelabMultiplayerMockup.Representations
             for (var i = 0; i < childCount; i++)
             {
                 var child = parent.GetChild(i).gameObject;
-                boneDictionary.Add(currentBoneId++, child);
+                boneDictionary.Add(currentBoneId++, new InterpolatedObject(child));
 
                 if (child.transform.childCount > 0) PopulateBoneDictionary(child.transform);
             }
@@ -227,7 +239,7 @@ namespace BonelabMultiplayerMockup.Representations
                 
                 HandleColliderObject(gameObject, meshCollider, genericGrip, manager);
 
-                colliderDictionary.Add(currentColliderId++, gameObject);
+                colliderDictionary.Add(currentColliderId++, new InterpolatedObject(gameObject));
             }
 
             foreach (var collider in Player.GetPhysicsRig().GetComponentsInChildren<BoxCollider>())
@@ -251,7 +263,7 @@ namespace BonelabMultiplayerMockup.Representations
                 rigidbody.isKinematic = true;
                 
                 HandleColliderObject(gameObject, boxCollider, genericGrip, manager);
-                colliderDictionary.Add(currentColliderId++, gameObject);
+                colliderDictionary.Add(currentColliderId++, new InterpolatedObject(gameObject));
             }
 
             foreach (var collider in Player.GetPhysicsRig().GetComponentsInChildren<CapsuleCollider>())
@@ -279,7 +291,7 @@ namespace BonelabMultiplayerMockup.Representations
                 
                 HandleColliderObject(gameObject, capsuleCollider, genericGrip, manager);
 
-                colliderDictionary.Add(currentColliderId++, gameObject);
+                colliderDictionary.Add(currentColliderId++, new InterpolatedObject(gameObject));
             }
 
             foreach (InteractableHost interactableHost in colliders.GetComponentsInChildren<InteractableHost>())
@@ -304,8 +316,9 @@ namespace BonelabMultiplayerMockup.Representations
                 var selectedBone = boneDictionary[boneId];
                 if (selectedBone != null)
                 {
-                    selectedBone.transform.position = compressedTransform.position;
-                    selectedBone.transform.rotation = compressedTransform.rotation;
+                    selectedBone.UpdateTarget(compressedTransform.position, compressedTransform.rotation);
+                    //selectedBone.transform.position = compressedTransform.position;
+                    //selectedBone.transform.rotation = compressedTransform.rotation;
                 }
             }
         }
@@ -319,8 +332,9 @@ namespace BonelabMultiplayerMockup.Representations
                 var selectedBone = colliderDictionary[colliderId];
                 if (selectedBone != null)
                 {
-                    selectedBone.transform.position = compressedTransform.position;
-                    selectedBone.transform.eulerAngles = compressedTransform.rotation.eulerAngles;
+                    selectedBone.UpdateTarget(compressedTransform.position, compressedTransform.rotation);
+                    //selectedBone.transform.position = compressedTransform.position;
+                    //selectedBone.transform.eulerAngles = compressedTransform.rotation.eulerAngles;
                 }
             }
         }

@@ -47,6 +47,8 @@ namespace BonelabMultiplayerMockup.Object
         public Dictionary<SimpleGripEvents, byte> gripEvents = new Dictionary<SimpleGripEvents, byte>();
         public static List<ushort> npcGroupIdsToSync = new List<ushort>();
 
+        public InterpolatedObject InterpolatedObject;
+
         private bool hasUpdatedBefore = false;
 
         // Sync nearest <maxNpcsToSync> NPCs and thats all. The specific NPCs which are synced are the ones closest. Good for performance.
@@ -76,6 +78,11 @@ namespace BonelabMultiplayerMockup.Object
             }
 
             _rigidbody = gameObject.GetComponent<Rigidbody>();
+
+            if (_rigidbody)
+            {
+                InterpolatedObject = new InterpolatedObject(gameObject);
+            }
 
             if (IsClientSimulated())
             {
@@ -178,7 +185,7 @@ namespace BonelabMultiplayerMockup.Object
             foreach (var pair in npcWithRoots)
             {
                 SyncedObject syncedObject = pair.Value.gameObject.GetComponent<SyncedObject>();
-                if (syncedObject.IsClientSimulated())
+                if (syncedObject.IsClientSimulated() && !syncedObject._rigidbody.IsSleeping())
                 {
                     groupIdsFlipped.Add(pair.Value.transform.position, pair.Key);
                 }
@@ -586,6 +593,14 @@ namespace BonelabMultiplayerMockup.Object
             groupId = newGroupId;
         }
 
+        public void Update()
+        {
+            if (!IsClientSimulated())
+            {
+                InterpolatedObject.Lerp();
+            }
+        }
+
         private static void FutureProofSync(GameObject gameObject, ushort groupId, long ownerId)
         {
             if (gameObject.GetComponent<SyncedObject>())
@@ -887,8 +902,7 @@ namespace BonelabMultiplayerMockup.Object
                     _rigidbody.isKinematic = true;
                 }
                 
-                gameObject.transform.position = compressedTransform.position;
-                gameObject.transform.eulerAngles = compressedTransform.rotation.eulerAngles;
+                InterpolatedObject.UpdateTarget(compressedTransform.position, compressedTransform.rotation);
             }
         }
 
