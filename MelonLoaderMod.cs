@@ -29,7 +29,7 @@ namespace BonelabMultiplayerMockup
         public const string Name = "BonelabMultiplayerMockup"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "notnotnotswipez"; // Author of the Mod.  (Set as null if none)
         public const string Company = null; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "3.5.0"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "4.0.0"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = null; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -41,7 +41,8 @@ namespace BonelabMultiplayerMockup
         private static byte currentBoneId = 0;
         private static byte currentColliderId = 0;
         private int updateCount = 0;
-        private int desiredFrames = 2;
+        private int desiredFrames = 3;
+        private static float currentStall = 1;
         public static string sceneName = "";
         public static bool waitingForSceneLoad = false;
 
@@ -53,6 +54,12 @@ namespace BonelabMultiplayerMockup
             
             PopulateBoneDictionary(Player.GetRigManager().GetComponentInChildren<RigManager>().avatar.gameObject.transform);
             PopulateCurrentColliderData();
+        }
+
+        private static IEnumerator StallLayerChange(GameObject gameObject, float stallAmount)
+        {
+            yield return new WaitForSecondsRealtime(stallAmount);
+            gameObject.layer = LayerMask.NameToLayer("Player");
         }
 
         public static void PopulateCurrentColliderData()
@@ -100,7 +107,7 @@ namespace BonelabMultiplayerMockup
                 {
                     continue;
                 }
-                
+
                 colliderDictionary.Add(currentColliderId++, collider.gameObject);
             }
         }
@@ -239,11 +246,6 @@ namespace BonelabMultiplayerMockup
                         SyncedObject.CleanData(true);
                     }
                 }
-            }
-
-            foreach (var player in PlayerRepresentation.representations.Values)
-            {
-                player.Update();
             }
 
             updateCount++;

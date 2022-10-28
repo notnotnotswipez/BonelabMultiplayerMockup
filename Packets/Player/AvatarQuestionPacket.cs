@@ -1,4 +1,5 @@
 using BonelabMultiplayerMockup.Nodes;
+using BonelabMultiplayerMockup.Utils;
 using MelonLoader;
 using SLZ.Rig;
 
@@ -18,7 +19,7 @@ namespace BonelabMultiplayerMockup.Packets.Player
 
         public override void ReadData(PacketByteBuf packetByteBuf, long sender)
         {
-            MelonLogger.Msg("Asked a question about this clients avatar, sending response to the server.");
+            DebugLogger.Msg("Asked a question about this clients avatar, sending response to the server.");
             long userIdToSend = DiscordIntegration.GetLongId(packetByteBuf.ReadByte());
             AvatarChangeData avatarChangeData = new AvatarChangeData()
             {

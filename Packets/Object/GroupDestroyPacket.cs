@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using BonelabMultiplayerMockup.NetworkData;
 using BonelabMultiplayerMockup.Object;
+using BonelabMultiplayerMockup.Utils;
 using MelonLoader;
 using UnityEngine;
 
@@ -60,8 +61,8 @@ namespace BonelabMultiplayerMockup.Packets.Object
             syncedObjectsToRemove.Clear();
 
             SyncedObject.queuedObjectsToDelete.Remove(groupId);
-            MelonLogger.Msg("Destroyed group Id: "+groupId);
-            MelonLogger.Msg("Size: "+SyncedObject.queuedObjectsToDelete.Count);
+            DebugLogger.Msg("Destroyed group Id: "+groupId);
+            DebugLogger.Msg("Size: "+SyncedObject.queuedObjectsToDelete.Count);
         }
     }
 

@@ -404,6 +404,7 @@
         <Compile Include="Object\InterpolatedObject.cs" />
         <Compile Include="Object\SyncedObject.cs" />
         <Compile Include="Packets\DebugAssistance.cs" />
+        <Compile Include="Packets\Gun\BalloonGunFirePacket.cs" />
         <Compile Include="Packets\Gun\GunStatePacket.cs" />
         <Compile Include="Packets\Gun\MagInsertPacket.cs" />
         <Compile Include="Packets\Object\GroupDestroyPacket.cs" />
@@ -423,6 +424,7 @@
         <Compile Include="Packets\Player\IdCatchupPacket.cs" />
         <Compile Include="Packets\Player\PlayerBonePacket.cs" />
         <Compile Include="Packets\Player\PlayerColliderPacket.cs" />
+        <Compile Include="Packets\Player\PlayerDamagePacket.cs" />
         <Compile Include="Packets\Player\RequestIdsPacket.cs" />
         <Compile Include="Packets\Player\SceneChangePacket.cs" />
         <Compile Include="Packets\Player\ShortIdPacket.cs" />

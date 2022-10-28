@@ -834,7 +834,7 @@ namespace BonelabMultiplayerMockup.Object
                    Quaternion.Angle(transform.rotation, lastRotation) > 0.05f;
         }
 
-        private static string GetGameObjectPath(GameObject obj)
+        public static string GetGameObjectPath(GameObject obj)
         {
             var path = "/" + obj.name;
             while (obj.transform.parent)

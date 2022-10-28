@@ -21,6 +21,8 @@ namespace BonelabMultiplayerMockup.Packets
         NpcDeathPacket = 16,
         LevelResponsePacket = 17,
         SceneChangePacket = 18,
-        SimpleGripEventPacket = 19
+        SimpleGripEventPacket = 19,
+        BalloonFirePacket = 20,
+        PlayerDamagePacket = 21
     }
 }

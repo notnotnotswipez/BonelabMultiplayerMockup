@@ -29,9 +29,10 @@ namespace BonelabMultiplayerMockup.Object
         {
             if (timeElapsed < lerpDuration)
             {
-                timeElapsed += Time.deltaTime;
-                go.transform.position = Vector3.Lerp(go.transform.position, targetPos, timeElapsed / lerpDuration);
-                go.transform.rotation = Quaternion.Lerp(go.transform.rotation, targetRot, timeElapsed / lerpDuration);
+                
+                timeElapsed += Time.unscaledDeltaTime;
+                go.transform.position = Vector3.LerpUnclamped(go.transform.position, targetPos, timeElapsed / lerpDuration);
+                go.transform.rotation = Quaternion.LerpUnclamped(go.transform.rotation, targetRot, timeElapsed / lerpDuration);
             }
         }
     }

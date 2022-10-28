@@ -40,6 +40,8 @@ namespace BonelabMultiplayerMockup.Packets
             MessageReaders.Add(NetworkMessageType.LevelResponsePacket, new LoadedLevelResponsePacket());
             MessageReaders.Add(NetworkMessageType.SceneChangePacket, new SceneChangePacket());
             MessageReaders.Add(NetworkMessageType.SimpleGripEventPacket, new SimpleGripEventPacket());
+            MessageReaders.Add(NetworkMessageType.BalloonFirePacket, new BalloonGunFirePacket());
+            MessageReaders.Add(NetworkMessageType.PlayerDamagePacket, new PlayerDamagePacket());
         }
 
         private static IEnumerator WaitForSceneLoadHandlePackets()

@@ -1,4 +1,5 @@
 using BonelabMultiplayerMockup.Representations;
+using BonelabMultiplayerMockup.Utils;
 using MelonLoader;
 
 namespace BonelabMultiplayerMockup.Packets.Player
@@ -21,7 +22,7 @@ namespace BonelabMultiplayerMockup.Packets.Player
             long userId = DiscordIntegration.GetLongId(packetByteBuf.ReadByte());
             string barcode = packetByteBuf.ReadString();
             
-            MelonLogger.Msg(userId+" sent a request to change their avatar to barcode: "+barcode);
+            DebugLogger.Msg(userId+" sent a request to change their avatar to barcode: "+barcode);
             
             if (PlayerRepresentation.representations.ContainsKey(userId))
             {

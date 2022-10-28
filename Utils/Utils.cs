@@ -1,3 +1,4 @@
+using BonelabMultiplayerMockup.Object;
 using Il2CppSystem.Reflection;
 using UnhollowerRuntimeLib;
 using UnityEngine;
@@ -25,6 +26,31 @@ namespace BonelabMultiplayerMockup.Utils
                 prop.SetValue(dst, prop.GetValue(original, null), null);
             }
             return dst as T;
+        }
+
+        public static bool IsPlayerPart(GameObject gameObject)
+        {
+            string path = SyncedObject.GetGameObjectPath(gameObject);
+            if (path.ToLower().Contains("(playerrep)"))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        public static bool IsSoftBody(GameObject gameObject)
+        {
+            if (gameObject.name.Contains("BreastLf") || gameObject.name.Contains("BreastRt"))
+            {
+                return true;
+            }
+            if (gameObject.name.Contains("ButtLf") || gameObject.name.Contains("ButtRt"))
+            {
+                return true;
+            }
+
+            return false;
         }
     }
 }
