@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using AkilliMum.SRP.Mirror;
+using BonelabMultiplayerMockup.Extention;
 using BonelabMultiplayerMockup.NetworkData;
 using BonelabMultiplayerMockup.Nodes;
 using BonelabMultiplayerMockup.Object;
@@ -29,7 +31,7 @@ namespace BonelabMultiplayerMockup
         public const string Name = "BonelabMultiplayerMockup"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "notnotnotswipez"; // Author of the Mod.  (Set as null if none)
         public const string Company = null; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "4.0.0"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "5.0.0"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = null; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -46,6 +48,17 @@ namespace BonelabMultiplayerMockup
         public static string sceneName = "";
         public static bool waitingForSceneLoad = false;
 
+        public static GameObject pelvis;
+        public static byte pelvisId;
+        
+        public static MelonPreferences_Category BLMPCategory;
+        public static MelonPreferences_Entry<bool> playerMotionSmoothing;
+
+        public override void OnInitializeMelon()
+        {
+            BLMPCategory = MelonPreferences.CreateCategory("BLMP");
+            playerMotionSmoothing = BLMPCategory.CreateEntry<bool>("playerMotionSmoothing", false);
+        }
 
         public static void PopulateCurrentAvatarData()
         {
@@ -54,12 +67,6 @@ namespace BonelabMultiplayerMockup
             
             PopulateBoneDictionary(Player.GetRigManager().GetComponentInChildren<RigManager>().avatar.gameObject.transform);
             PopulateCurrentColliderData();
-        }
-
-        private static IEnumerator StallLayerChange(GameObject gameObject, float stallAmount)
-        {
-            yield return new WaitForSecondsRealtime(stallAmount);
-            gameObject.layer = LayerMask.NameToLayer("Player");
         }
 
         public static void PopulateCurrentColliderData()
@@ -78,6 +85,12 @@ namespace BonelabMultiplayerMockup
                     continue;
                 }
 
+                if (collider.gameObject.name.Equals("Pelvis"))
+                {
+                    pelvis = collider.gameObject;
+                    pelvisId = currentColliderId;
+                }
+
                 colliderDictionary.Add(currentColliderId++, collider.gameObject);
             }
 
@@ -91,6 +104,12 @@ namespace BonelabMultiplayerMockup
                 if (collider.GetComponentInParent<SlotContainer>())
                 {
                     continue;
+                }
+                
+                if (collider.gameObject.name.Equals("Pelvis"))
+                {
+                    pelvis = collider.gameObject;
+                    pelvisId = currentColliderId;
                 }
 
                 colliderDictionary.Add(currentColliderId++, collider.gameObject);
@@ -106,6 +125,12 @@ namespace BonelabMultiplayerMockup
                 if (collider.GetComponentInParent<SlotContainer>())
                 {
                     continue;
+                }
+                
+                if (collider.gameObject.name.Equals("Pelvis"))
+                {
+                    pelvis = collider.gameObject;
+                    pelvisId = currentColliderId;
                 }
 
                 colliderDictionary.Add(currentColliderId++, collider.gameObject);
@@ -248,6 +273,10 @@ namespace BonelabMultiplayerMockup
                 }
             }
 
+            foreach (PlayerRepresentation playerRepresentation in PlayerRepresentation.representations.Values) {
+                playerRepresentation.Update();
+            }
+
             updateCount++;
             if (updateCount >= desiredFrames)
             {
@@ -289,7 +318,7 @@ namespace BonelabMultiplayerMockup
                             ushort lastId = 0;
                             foreach (var synced in syncedObjects)
                             {
-                                lastId = synced.groupId;
+                                lastId = synced.currentId;
                                 synced.DestroySyncable(true);
                             }
 
@@ -321,8 +350,11 @@ namespace BonelabMultiplayerMockup
                     break;
                 }
 
-                var simplifiedTransform = new CompressedTransform(bone.transform.position,
-                    Quaternion.Euler(bone.transform.eulerAngles));
+                Quaternion rotation = bone.transform.rotation.Diff(pelvis.transform.rotation);
+                Vector3 position = bone.transform.position - pelvis.transform.position;
+
+                var simplifiedTransform = new CompressedTransform(position,
+                    rotation);
 
                 PlayerBoneData playerBoneData = new PlayerBoneData()
                 {
@@ -346,9 +378,18 @@ namespace BonelabMultiplayerMockup
                     // Assume its all wrong
                     break;
                 }
+                
+                Quaternion rotation = collider.transform.rotation.Diff(pelvis.transform.rotation);
+                Vector3 position = collider.transform.position - pelvis.transform.position;
 
-                var simplifiedTransform = new CompressedTransform(collider.transform.position,
-                    Quaternion.Euler(collider.transform.eulerAngles));
+                if (i == pelvisId)
+                {
+                    rotation = pelvis.transform.rotation;
+                    position = pelvis.transform.position;
+                }
+
+                var simplifiedTransform = new CompressedTransform(position,
+                    rotation);
 
                 PlayerColliderData playerColliderData = new PlayerColliderData()
                 {

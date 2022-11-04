@@ -38,6 +38,7 @@ namespace BonelabMultiplayerMockup.Object
         public Vector3 lastPosition;
         public Quaternion lastRotation;
         public long simulatorId;
+        public bool isGrabbed = false;
         public ushort currentId;
         public ushort groupId;
         public long firstEverOwner = 0;
@@ -48,6 +49,7 @@ namespace BonelabMultiplayerMockup.Object
         public static List<ushort> npcGroupIdsToSync = new List<ushort>();
 
         public InterpolatedObject InterpolatedObject;
+        private bool shouldTeleport = true;
 
         private bool hasUpdatedBefore = false;
 
@@ -60,6 +62,7 @@ namespace BonelabMultiplayerMockup.Object
 
         public void Start()
         {
+            shouldTeleport = true;
             AIBrain aiBrain = PoolManager.GetComponentOnObject<AIBrain>(gameObject);
             isNpc = aiBrain != null;
             if (isNpc)
@@ -103,6 +106,30 @@ namespace BonelabMultiplayerMockup.Object
             }
             
             PopulateGripEvents();
+        }
+
+        public void SetGrabbed(bool grabbed)
+        {
+            isGrabbed = grabbed;
+        }
+
+        public void BroadcastGrabState(bool grabbed)
+        {
+            if (grabbed)
+            {
+                // Means this client has grabbed it.
+                isGrabbed = false;
+            }
+
+            var grabStateData = new GrabStateData()
+            {
+                objectId = currentId,
+                state = (byte)(grabbed ? 1 : 0)
+            };
+
+            var packetByteBuf =
+                PacketHandler.CompressMessage(NetworkMessageType.GrabStatePacket, grabStateData);
+            Node.activeNode.BroadcastMessage((byte)NetworkChannel.Transaction, packetByteBuf.getBytes());
         }
 
         private void PopulateGripEvents()
@@ -165,7 +192,7 @@ namespace BonelabMultiplayerMockup.Object
                 gripIndex = gripIndex,
                 eventIndex = 2
             };
-            MelonLogger.Msg("Sent grip index: "+2+" for: "+gripIndex);
+            DebugLogger.Msg("Sent grip index: "+2+" for: "+gripIndex);
 
             var packetByteBuf =
                 PacketHandler.CompressMessage(NetworkMessageType.SimpleGripEventPacket, gripEventData);
@@ -311,26 +338,45 @@ namespace BonelabMultiplayerMockup.Object
                     return;
                 }
             }
-
-            var shouldSendUpdate = HasChangedPositions();
-            if (IsClientSimulated() && shouldSendUpdate)
+            if (IsClientSimulated())
             {
-                var compressedTransform =
-                    new CompressedTransform(gameObject.transform.position,
-                        Quaternion.Euler(gameObject.transform.eulerAngles));
-
-                var transformUpdateData = new TransformUpdateData
+                var shouldSendUpdate = false;
+                var changedPositions = HasChangedPositions();
+                if (_rigidbody)
                 {
-                    objectId = currentId,
-                    userId = DiscordIntegration.currentUser.Id,
-                    compressedTransform = compressedTransform
-                };
+                    if (!_rigidbody.IsSleeping())
+                    {
+                        if (changedPositions)
+                        {
+                            shouldSendUpdate = true;
+                        }
+                    }
+                }
+                else
+                {
+                    shouldSendUpdate = changedPositions;
+                }
 
-                var packetByteBuf =
-                    PacketHandler.CompressMessage(NetworkMessageType.TransformUpdatePacket, transformUpdateData);
-                Node.activeNode.BroadcastMessage((byte)NetworkChannel.Unreliable, packetByteBuf.getBytes());
+
+
+                if (shouldSendUpdate)
+                {
+                    var compressedTransform =
+                        new CompressedTransform(gameObject.transform.position,
+                            Quaternion.Euler(gameObject.transform.eulerAngles));
+
+                    var transformUpdateData = new TransformUpdateData
+                    {
+                        objectId = currentId,
+                        userId = DiscordIntegration.currentUser.Id,
+                        compressedTransform = compressedTransform
+                    };
+
+                    var packetByteBuf =
+                        PacketHandler.CompressMessage(NetworkMessageType.TransformUpdatePacket, transformUpdateData);
+                    Node.activeNode.BroadcastMessage((byte)NetworkChannel.Unreliable, packetByteBuf.getBytes()); 
+                }
             }
-
             UpdateStoredPositions();
         }
 
@@ -719,7 +765,24 @@ namespace BonelabMultiplayerMockup.Object
             }
             else
             {
+                shouldTeleport = true;
                 if (!Node.activeNode.connectedUsers.Contains(simulatorId)) SetOwner(DiscordIntegration.lobby.OwnerId);
+            }
+        }
+
+        public void OnDestroy()
+        {
+            if (!totalRemovedGroups.Contains(groupId))
+            {
+                totalRemovedGroups.Add(groupId);
+                GroupDestroyData groupDestroyData = new GroupDestroyData()
+                {
+                    groupId = groupId,
+                    backupObjectId = currentId
+                };
+
+                PacketByteBuf message = PacketHandler.CompressMessage(NetworkMessageType.GroupDestroyPacket, groupDestroyData);
+                Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, message.getBytes());   
             }
         }
 
@@ -902,7 +965,8 @@ namespace BonelabMultiplayerMockup.Object
                     _rigidbody.isKinematic = true;
                 }
                 
-                InterpolatedObject.UpdateTarget(compressedTransform.position, compressedTransform.rotation);
+                InterpolatedObject.UpdateTarget(compressedTransform.position, compressedTransform.rotation, shouldTeleport);
+                shouldTeleport = false;
             }
         }
 

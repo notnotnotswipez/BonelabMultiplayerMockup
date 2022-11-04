@@ -23,6 +23,9 @@ namespace BonelabMultiplayerMockup.Packets
         SceneChangePacket = 18,
         SimpleGripEventPacket = 19,
         BalloonFirePacket = 20,
-        PlayerDamagePacket = 21
+        PlayerDamagePacket = 21,
+        GrabStatePacket = 22,
+        PlayerStartGrabPacket = 23,
+        PlayerEndGrabPacket = 24
     }
 }

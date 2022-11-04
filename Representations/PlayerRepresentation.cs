@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using BonelabMultiplayerMockup.Extention;
 using BonelabMultiplayerMockup.NetworkData;
 using BonelabMultiplayerMockup.Nodes;
 using BonelabMultiplayerMockup.Object;
@@ -14,6 +15,7 @@ using Discord;
 using HarmonyLib;
 using MelonLoader;
 using PuppetMasta;
+using SLZ;
 using SLZ.AI;
 using SLZ.Combat;
 using SLZ.Data;
@@ -25,6 +27,7 @@ using UnhollowerBaseLib;
 using UnhollowerRuntimeLib;
 using Unity.Barracuda;
 using UnityEngine;
+using UnityEngine.XR;
 using Avatar = SLZ.VRMK.Avatar;
 
 namespace BonelabMultiplayerMockup.Representations
@@ -34,16 +37,26 @@ namespace BonelabMultiplayerMockup.Representations
         public static Dictionary<long, PlayerRepresentation> representations =
             new Dictionary<long, PlayerRepresentation>();
         
-        public Dictionary<byte, GameObject> boneDictionary = new Dictionary<byte, GameObject>();
-        public Dictionary<byte, GameObject> colliderDictionary = new Dictionary<byte, GameObject>();
+        public Dictionary<byte, InterpolatedObject> boneDictionary = new Dictionary<byte, InterpolatedObject>();
+        public Dictionary<byte, InterpolatedObject> colliderDictionary = new Dictionary<byte, InterpolatedObject>();
 
         private byte currentBoneId;
         private byte currentColliderId = 0;
         public GameObject playerRep;
         public GameObject colliders;
+        public GameObject pelvis;
+        public GameObject lHand;
+        public GameObject rHand;
+        public byte pelvisIndex = 0;
+        public bool simulated = false;
         public User user;
         public string username;
         public string currentBarcode = "";
+
+        public float avatarMass = 0;
+
+        public FixedJoint rHandJoint;
+        public FixedJoint lHandJoint;
 
         private static HandPose softGrab;
         private static List<AudioClip> sounds = new List<AudioClip>();
@@ -78,7 +91,7 @@ namespace BonelabMultiplayerMockup.Representations
             currentBoneId = 0;
             currentColliderId = 0;
             foreach (var colliderObject in colliderDictionary.Values) {
-                GameObject.Destroy(colliderObject);
+                GameObject.Destroy(colliderObject.go);
             }
 
             boneDictionary.Clear();
@@ -104,6 +117,10 @@ namespace BonelabMultiplayerMockup.Representations
                 GameObject spawned = GameObject.Instantiate(o);
                 Avatar avatar = spawned.GetComponent<Avatar>();
                 foreach (var skinnedMesh in avatar.headMeshes)
+                {
+                    skinnedMesh.enabled = false;
+                }
+                foreach (var skinnedMesh in avatar.hairMeshes)
                 {
                     skinnedMesh.enabled = false;
                 }
@@ -151,10 +168,152 @@ namespace BonelabMultiplayerMockup.Representations
             for (var i = 0; i < childCount; i++)
             {
                 var child = parent.GetChild(i).gameObject;
-                boneDictionary.Add(currentBoneId++, child);
+                boneDictionary.Add(currentBoneId++, new InterpolatedObject(child));
 
                 if (child.transform.childCount > 0) PopulateBoneDictionary(child.transform);
             }
+        }
+
+        public void GrabClientCollider(byte personalIndex, Handedness handedness)
+        {
+            GameObject physicsBone = null;
+
+            foreach (var collider in BonelabMultiplayerMockup.colliderDictionary)
+            {
+                if (collider.Key == personalIndex)
+                {
+                    physicsBone = collider.Value;
+                }
+            }
+
+            // The collider might be nested inside a physics bone, no point in moving a singular lose collider GO so we search upwards.
+            while (physicsBone.transform.parent.gameObject != Player.GetPhysicsRig().gameObject)
+            {
+                physicsBone = physicsBone.transform.parent.gameObject;
+            }
+
+            if (physicsBone == null || Utils.Utils.IsSoftBody(physicsBone))
+            {
+                physicsBone = BonelabMultiplayerMockup.pelvis;
+            }
+
+            if (handedness == Handedness.LEFT)
+            {
+                lHandJoint = physicsBone.AddComponent<FixedJoint>();
+                lHandJoint.connectedBody = lHand.GetComponent<Rigidbody>();
+                lHandJoint.breakForce = Single.PositiveInfinity;
+                lHandJoint.breakTorque = Single.PositiveInfinity;
+            }
+
+            if (handedness == Handedness.RIGHT)
+            {
+                rHandJoint = physicsBone.AddComponent<FixedJoint>();
+                rHandJoint.connectedBody = rHand.GetComponent<Rigidbody>();
+                rHandJoint.breakForce = Single.PositiveInfinity;
+                rHandJoint.breakTorque = Single.PositiveInfinity;
+            }
+        }
+
+        public void LetGoOfClientCollider(Handedness handedness)
+        {
+            if (handedness == Handedness.LEFT)
+            {
+                if (lHandJoint != null)
+                {
+                    GameObject.Destroy(lHandJoint);
+                    lHandJoint = null;
+                }
+            }
+            if (handedness == Handedness.RIGHT)
+            {
+                if (rHandJoint != null)
+                {
+                    GameObject.Destroy(rHandJoint);
+                    rHandJoint = null;
+                }
+            }
+        }
+
+        public void GrabThisGuy(Handedness handedness, GameObject grabbedCollider)
+        {
+            simulated = true;
+            if (handedness == Handedness.LEFT)
+            {
+                // This is a hilariously shitty workaround but connecting a fixed joint seems to make the pelvis fall
+                pelvis.transform.parent = Player.leftHand.transform;
+                HandVariables.lRepPelvisJoint = pelvis.AddComponent<FixedJoint>();
+                //HandVariables.lRepPelvisJoint.connectedBody = Player.leftHand.GetComponentInChildren<Rigidbody>();
+                HandVariables.lRepPelvisJoint.breakForce = Single.PositiveInfinity;
+                HandVariables.lRepPelvisJoint.breakTorque = Single.PositiveInfinity;
+                HandVariables.lGrabbedPlayerRep = this;
+            }
+            if (handedness == Handedness.RIGHT)
+            {
+                pelvis.transform.parent = Player.rightHand.transform;
+                HandVariables.rRepPelvisJoint = pelvis.AddComponent<FixedJoint>();
+                //HandVariables.rRepPelvisJoint.connectedBody = Player.rightHand.GetComponentInChildren<Rigidbody>();
+                HandVariables.rRepPelvisJoint.breakForce = Single.PositiveInfinity;
+                HandVariables.rRepPelvisJoint.breakTorque = Single.PositiveInfinity;
+                HandVariables.rGrabbedPlayerRep = this;
+            }
+
+            byte colliderIndex = 0;
+
+            foreach (var colliders in colliderDictionary)
+            {
+                if (colliders.Value.go == grabbedCollider)
+                {
+                    colliderIndex = colliders.Key;
+                    break;
+                }
+            }
+            
+            var playerGrabData = new PlayerStartGrabData()
+            {
+                userIdGrabber = DiscordIntegration.currentUser.Id,
+                hand = (byte)(handedness == Handedness.RIGHT ? 1 : 0),
+                pelvisAtGrabEvent = new CompressedTransform(pelvis.transform.position, pelvis.transform.rotation),
+                colliderIndex = colliderIndex
+            };
+            var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.PlayerStartGrabPacket, playerGrabData);
+            Node.activeNode.SendMessage(this.user.Id, (byte)NetworkChannel.Transaction, catchupBuff.getBytes());
+        }
+
+        public void LetGoOfThisGuy(Handedness handedness)
+        {
+            if (handedness == Handedness.LEFT)
+            {
+                if (HandVariables.lRepPelvisJoint != null)
+                {
+                    GameObject.Destroy(HandVariables.lRepPelvisJoint);
+                    HandVariables.lRepPelvisJoint = null;
+                    HandVariables.lGrabbedPlayerRep = null;
+                    if (HandVariables.rRepPelvisJoint == null)
+                    {
+                        simulated = false;
+                        pelvis.transform.parent = playerRep.transform;
+                    }
+                }
+            }
+            if (handedness == Handedness.RIGHT)
+            {
+                GameObject.Destroy(HandVariables.rRepPelvisJoint);
+                HandVariables.rRepPelvisJoint = null;
+                HandVariables.rGrabbedPlayerRep = null;
+                if (HandVariables.lRepPelvisJoint == null)
+                {
+                    simulated = false;
+                    pelvis.transform.parent = playerRep.transform;
+                }
+            }
+            
+            var playerEndGrabData = new PlayerEndGrabData()
+            {
+                userIdGrabber = DiscordIntegration.currentUser.Id,
+                hand = (byte)(handedness == Handedness.RIGHT ? 1 : 0),
+            };
+            var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.PlayerEndGrabPacket, playerEndGrabData);
+            Node.activeNode.SendMessage(this.user.Id, (byte)NetworkChannel.Transaction, catchupBuff.getBytes());
         }
 
         private void AddCorrectProperties(GameObject gameObject, Collider collider, GenericGrip genericGripOriginal)
@@ -231,6 +390,7 @@ namespace BonelabMultiplayerMockup.Representations
 
         private void PopulateColliderDictionary()
         {
+            avatarMass = Player.GetCurrentAvatar().massTotal;
             if(colliders != null)
             {
                 GameObject.Destroy(colliders);
@@ -269,6 +429,12 @@ namespace BonelabMultiplayerMockup.Representations
                 meshCollider.skinWidth = collider.skinWidth;
                 gameObject.transform.parent = colliderParent.transform;
 
+                if (collider.gameObject.name.Equals("Pelvis"))
+                {
+                    pelvis = gameObject;
+                    pelvisIndex = currentColliderId;
+                }
+
                 if (!addedAiTarget)
                 {
                     AITarget aiTarget = gameObject.AddComponent<AITarget>();
@@ -283,7 +449,7 @@ namespace BonelabMultiplayerMockup.Representations
                 
                 HandleColliderObject(gameObject, meshCollider, genericGrip, manager);
 
-                colliderDictionary.Add(currentColliderId++, gameObject);
+                colliderDictionary.Add(currentColliderId++, new InterpolatedObject(gameObject));
             }
 
             foreach (var collider in Player.GetPhysicsRig().GetComponentsInChildren<BoxCollider>())
@@ -306,9 +472,25 @@ namespace BonelabMultiplayerMockup.Representations
                 Rigidbody rigidbody = gameObject.AddComponent<Rigidbody>();
                 rigidbody.isKinematic = true;
                 
+                if (collider.gameObject.name.Equals("Pelvis"))
+                {
+                    pelvis = gameObject;
+                    pelvisIndex = currentColliderId;
+                }
+                
+                if (collider.gameObject.name.Equals("Hand (right)"))
+                {
+                    rHand = gameObject;
+                }
+                
+                if (collider.gameObject.name.Equals("Hand (left)"))
+                {
+                    lHand = gameObject;
+                }
+                
                 HandleColliderObject(gameObject, boxCollider, genericGrip, manager);
 
-                colliderDictionary.Add(currentColliderId++, gameObject);
+                colliderDictionary.Add(currentColliderId++, new InterpolatedObject(gameObject));
             }
 
             foreach (var collider in Player.GetPhysicsRig().GetComponentsInChildren<CapsuleCollider>())
@@ -333,10 +515,38 @@ namespace BonelabMultiplayerMockup.Representations
                 gameObject.transform.parent = colliderParent.transform;
                 Rigidbody rigidbody = gameObject.AddComponent<Rigidbody>();
                 rigidbody.isKinematic = true;
+                
+                if (collider.gameObject.name.Equals("Pelvis"))
+                {
+                    pelvis = gameObject;
+                    pelvisIndex = currentColliderId;
+                }
 
                 HandleColliderObject(gameObject, capsuleCollider, genericGrip, manager);
 
-                colliderDictionary.Add(currentColliderId++, gameObject);
+                colliderDictionary.Add(currentColliderId++, new InterpolatedObject(gameObject));
+            }
+
+            if (pelvis != null)
+            {
+                pelvis.name = "PelvisRoot";
+                pelvis.transform.parent = playerRep.transform;
+                Rigidbody pelvisBody = pelvis.GetComponent<Rigidbody>();
+                pelvisBody.constraints = RigidbodyConstraints.FreezeRotationZ | RigidbodyConstraints.FreezeRotationX;
+                colliders.transform.parent = pelvis.transform;
+                
+                for (int i = 0; i < playerRep.transform.childCount; i++)
+                {
+                    // Get all the top level stuff (Meshes and bone roots) and parent it. Better than full searching and parenting every collider and bone individually.
+                    GameObject child = playerRep.transform.GetChild(i).gameObject;
+                    
+                    // We want everything parented to the pelvis because this is our "root" which we can simulate client-side if we want.
+                    // Means we can move the player with no latency as long as the positions and rotations sent are relative to the pelvis.
+                    if (child != pelvis)
+                    {
+                        child.transform.parent = pelvis.transform;
+                    }
+                }
             }
 
             foreach (InteractableHost interactableHost in colliders.GetComponentsInChildren<InteractableHost>())
@@ -361,9 +571,25 @@ namespace BonelabMultiplayerMockup.Representations
                 var selectedBone = boneDictionary[boneId];
                 if (selectedBone != null)
                 {
-                    selectedBone.transform.position = compressedTransform.position;
-                    selectedBone.transform.rotation = compressedTransform.rotation;
+                    if (selectedBone.go != null){
+                        Quaternion rotation = pelvis.transform.rotation.Add(compressedTransform.rotation);
+                        Vector3 position = pelvis.transform.position + compressedTransform.position;
+
+                        selectedBone.UpdateTarget(position, rotation, true);
+                    }
                 }
+            }
+        }
+
+        public void Update()
+        {
+            foreach (InterpolatedObject interpolatedObject in boneDictionary.Values)
+            {
+                interpolatedObject.Lerp(BonelabMultiplayerMockup.playerMotionSmoothing.Value);
+            }
+            foreach (InterpolatedObject interpolatedObject in colliderDictionary.Values)
+            {
+                interpolatedObject.Lerp(BonelabMultiplayerMockup.playerMotionSmoothing.Value);
             }
         }
 
@@ -373,11 +599,34 @@ namespace BonelabMultiplayerMockup.Representations
 
             if (colliderDictionary.ContainsKey(colliderId))
             {
+
                 var selectedBone = colliderDictionary[colliderId];
                 if (selectedBone != null)
                 {
-                    selectedBone.transform.position = compressedTransform.position;
-                    selectedBone.transform.eulerAngles = compressedTransform.rotation.eulerAngles;
+                    bool teleport = true;
+                    
+                    if (selectedBone.go == null)
+                    {
+                            return;
+                    }
+
+                    if (colliderId == pelvisIndex)
+                    {
+                        if (simulated)
+                        {
+                            pelvis.transform.rotation = compressedTransform.rotation;
+                            return;
+                        }
+                    }
+                    Quaternion rotation = pelvis.transform.rotation.Add(compressedTransform.rotation);
+                    Vector3 position = pelvis.transform.position + compressedTransform.position;
+                    if (colliderId == pelvisIndex)
+                    {
+                        rotation = compressedTransform.rotation;
+                        position = compressedTransform.position;
+                    }
+
+                    selectedBone.UpdateTarget(position, rotation, teleport);
                 }
             }
         }

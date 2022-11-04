@@ -396,6 +396,7 @@
         <Compile Include="Discord\LobbyManager.cs" />
         <Compile Include="Discord\StorageManager.cs" />
         <Compile Include="Discord\StoreManager.cs" />
+        <Compile Include="Extention\QuaternionExtensions.cs" />
         <Compile Include="MelonLoaderMod.cs" />
         <Compile Include="NetworkData\CompressedTransform.cs" />
         <Compile Include="Nodes\Client.cs" />
@@ -407,6 +408,7 @@
         <Compile Include="Packets\Gun\BalloonGunFirePacket.cs" />
         <Compile Include="Packets\Gun\GunStatePacket.cs" />
         <Compile Include="Packets\Gun\MagInsertPacket.cs" />
+        <Compile Include="Packets\Object\GrabStatePacket.cs" />
         <Compile Include="Packets\Object\GroupDestroyPacket.cs" />
         <Compile Include="Packets\Object\InitializeSyncPacket.cs" />
         <Compile Include="Packets\Object\NpcDeathPacket.cs" />
@@ -425,6 +427,8 @@
         <Compile Include="Packets\Player\PlayerBonePacket.cs" />
         <Compile Include="Packets\Player\PlayerColliderPacket.cs" />
         <Compile Include="Packets\Player\PlayerDamagePacket.cs" />
+        <Compile Include="Packets\Player\PlayerEndGrabPacket.cs" />
+        <Compile Include="Packets\Player\PlayerStartGrabPacket.cs" />
         <Compile Include="Packets\Player\RequestIdsPacket.cs" />
         <Compile Include="Packets\Player\SceneChangePacket.cs" />
         <Compile Include="Packets\Player\ShortIdPacket.cs" />

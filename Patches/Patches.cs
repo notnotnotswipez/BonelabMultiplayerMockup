@@ -18,6 +18,7 @@ using SLZ.AI;
 using SLZ.Bonelab;
 using SLZ.Combat;
 using SLZ.Interaction;
+using SLZ.Marrow.Data;
 using SLZ.Marrow.Pool;
 using SLZ.Marrow.Warehouse;
 using SLZ.Props.Weapons;
@@ -72,30 +73,141 @@ namespace BonelabMultiplayerMockup.Patches
             }
         }
 
-        public static IEnumerator WaitForAttachSync(GameObject toSync)
+        public static IEnumerator WaitForAttachSync(GameObject toSync, Handedness hand, bool setCacheGrabbed)
         {
-            if (PatchVariables.shouldIgnoreGrabbing)
-            {
-                yield break;
-            }
-
-            PatchVariables.shouldIgnoreGrabbing = true;
-            yield return new WaitForFixedUpdate();
             yield return new WaitForFixedUpdate();
             var syncedObject = SyncedObject.GetSyncedComponent(toSync);
             if (syncedObject == null)
+            {
                 SyncedObject.Sync(toSync);
+                
+                // Get the component again
+                syncedObject = SyncedObject.GetSyncedComponent(toSync);
+                
+                // Could have been blacklisted.
+                if (syncedObject != null)
+                {
+                    if (setCacheGrabbed)
+                    {
+                        syncedObject.BroadcastGrabState(true);
+                        // We dont want duplicate cached synced objects cause obviously, its a bit pointless to store synced objects that belong to the same group on both hands.
+                        if (hand == Handedness.RIGHT)
+                        {
+                            if (HandVariables.lSyncedObject != null)
+                            {
+                                if (HandVariables.lSyncedObject.groupId != syncedObject.groupId)
+                                {
+                                    HandVariables.rSyncedObject = syncedObject;
+                                }
+                            }
+                            else
+                            {
+                                HandVariables.rSyncedObject = syncedObject;
+                            }
+                        }
+                        if (hand == Handedness.LEFT)
+                        {
+                            if (HandVariables.rSyncedObject != null)
+                            {
+                                if (HandVariables.rSyncedObject.groupId != syncedObject.groupId)
+                                {
+                                    HandVariables.lSyncedObject = syncedObject;
+                                }
+                            }
+                            else
+                            {
+                                HandVariables.lSyncedObject = syncedObject;
+                            }
+                        }
+                    }
+                }
+            }
             else
+            {
                 syncedObject.BroadcastOwnerChange();
-            
-            PatchVariables.shouldIgnoreGrabbing = false;
+                
+                if (setCacheGrabbed)
+                {
+                    syncedObject.BroadcastGrabState(true);
+                    if (hand == Handedness.RIGHT)
+                    {
+                        if (HandVariables.lSyncedObject != null)
+                        {
+                            if (HandVariables.lSyncedObject.groupId != syncedObject.groupId)
+                            {
+                                HandVariables.rSyncedObject = syncedObject;
+                            }
+                        }
+                        else
+                        {
+                            HandVariables.rSyncedObject = syncedObject;
+                        }
+                    }
+                    if (hand == Handedness.LEFT)
+                    {
+                        if (HandVariables.rSyncedObject != null)
+                        {
+                            if (HandVariables.rSyncedObject.groupId != syncedObject.groupId)
+                            {
+                                HandVariables.lSyncedObject = syncedObject;
+                            }
+                        }
+                        else
+                        {
+                            HandVariables.lSyncedObject = syncedObject;
+                        }
+                    }
+                }
+            }
+        }
+
+        public static IEnumerator WaitForObjectDetach(Handedness handedness)
+        {
+            yield return new WaitForSecondsRealtime(0.2f);
+            SyncedObject handedSynced = null;
+            if (handedness == Handedness.RIGHT)
+            {
+                handedSynced = HandVariables.rSyncedObject;
+            }
+            if (handedness == Handedness.LEFT)
+            {
+                handedSynced = HandVariables.lSyncedObject;
+            }
+
+            if (handedSynced != null)
+            {
+                if (!Utils.Utils.IsGrabbedStill(handedSynced))
+                {
+                    if (handedSynced.IsClientSimulated())
+                    {
+                        handedSynced.BroadcastGrabState(false);
+                    }
+                    if (handedness == Handedness.RIGHT)
+                    {
+                        HandVariables.rSyncedObject = null;
+                    }
+                    if (handedness == Handedness.LEFT)
+                    {
+                        HandVariables.lSyncedObject = null;
+                    }
+                }
+            }
         }
     }
 
-    public class HandJoints
+    public class HandVariables
     {
         public static FixedJoint lHandJoint;
         public static FixedJoint rHandJoint;
+        
+        public static FixedJoint lRepPelvisJoint;
+        public static FixedJoint rRepPelvisJoint;
+
+        public static PlayerRepresentation rGrabbedPlayerRep;
+        public static PlayerRepresentation lGrabbedPlayerRep;
+
+        public static SyncedObject lSyncedObject;
+        public static SyncedObject rSyncedObject;
     }
 
     public class Patches
@@ -130,7 +242,7 @@ namespace BonelabMultiplayerMockup.Patches
         [HarmonyPatch(typeof(AIBrain), "OnResurrection")]
         private class AiResurrectionPatch
         {
-            public static void Postfix(AIBrain __instance)
+            public static void Prefix(AIBrain __instance)
             {
                 if (DiscordIntegration.hasLobby)
                 {
@@ -155,10 +267,10 @@ namespace BonelabMultiplayerMockup.Patches
             }
         }
 
-        [HarmonyPatch(typeof(AssetPoolee), "OnDespawn")]
+        [HarmonyPatch(typeof(AssetPoolee), "StageForDespawn")]
         private class PoolDespawnPatch
         {
-            public static void Postfix(AssetPoolee __instance)
+            public static void Prefix(AssetPoolee __instance)
             {
                 if (DiscordIntegration.hasLobby)
                 {
@@ -241,13 +353,22 @@ namespace BonelabMultiplayerMockup.Patches
             }
         }
         
+        
         [HarmonyPatch(typeof(HandSFX), "PunchAttack", typeof(Collision), typeof(float), typeof(float))]
         public static class PunchDamagePatch
         {
             public static void Postfix(HandSFX __instance, Collision c, float impulse, float relVelSqr)
             {
-
                 GameObject collided = c.gameObject;
+                SyncedObject syncedObject = SyncedObject.GetSyncedComponent(collided);
+                if (syncedObject)
+                {
+                    if (!syncedObject.IsClientSimulated() && !syncedObject.isGrabbed)
+                    {
+                        syncedObject.BroadcastOwnerChange();
+                    }
+                }
+
                 if (!Utils.Utils.IsPlayerPart(c.gameObject))
                 {
                     return;
@@ -298,6 +419,16 @@ namespace BonelabMultiplayerMockup.Patches
                 }
 
                 GameObject collided = c.gameObject;
+                
+                SyncedObject collidedSynced = SyncedObject.GetSyncedComponent(collided);
+                if (collidedSynced)
+                {
+                    if (!collidedSynced.IsClientSimulated() && !collidedSynced.isGrabbed)
+                    {
+                        collidedSynced.BroadcastOwnerChange();
+                    }
+                }
+                
                 if (!Utils.Utils.IsPlayerPart(c.gameObject))
                 {
                     return;
@@ -352,6 +483,16 @@ namespace BonelabMultiplayerMockup.Patches
                 }
 
                 GameObject collided = c.gameObject;
+                
+                SyncedObject collidedSynced = SyncedObject.GetSyncedComponent(collided);
+                if (collidedSynced)
+                {
+                    if (!collidedSynced.IsClientSimulated() && !collidedSynced.isGrabbed)
+                    {
+                        collidedSynced.BroadcastOwnerChange();
+                    }
+                }
+                
                 if (!Utils.Utils.IsPlayerPart(c.gameObject))
                 {
                     return;
@@ -483,13 +624,23 @@ namespace BonelabMultiplayerMockup.Patches
                 {
                     if (__instance.handedness == Handedness.RIGHT)
                     {
-                        GameObject.Destroy(HandJoints.rHandJoint);
+                        GameObject.Destroy(HandVariables.rHandJoint);
+                        if (HandVariables.rGrabbedPlayerRep != null)
+                        {
+                            HandVariables.rGrabbedPlayerRep.LetGoOfThisGuy(Handedness.RIGHT);
+                        }
                     }
 
                     if (__instance.handedness == Handedness.LEFT)
                     {
-                        GameObject.Destroy(HandJoints.lHandJoint);
+                        GameObject.Destroy(HandVariables.lHandJoint);
+                        if (HandVariables.lGrabbedPlayerRep != null)
+                        {
+                            HandVariables.lGrabbedPlayerRep.LetGoOfThisGuy(Handedness.LEFT);
+                        }
                     }
+
+                    MelonCoroutines.Start(PatchCoroutines.WaitForObjectDetach(__instance.handedness));
                 }
             }
 
@@ -502,35 +653,52 @@ namespace BonelabMultiplayerMockup.Patches
                     {
                         if (Utils.Utils.IsPlayerPart(objectToAttach))
                         {
+                            PlayerRepresentation playerRepresentation = Utils.Utils.GetRepresentation(objectToAttach);
                             if (__instance.handedness == Handedness.RIGHT)
                             {
-                                if (HandJoints.rHandJoint != null)
+                                if (Utils.Utils.CanPickup(playerRepresentation))
                                 {
-                                    GameObject.Destroy(HandJoints.rHandJoint);
+                                    MelonLogger.Msg("Can pickup this player.");
+                                    playerRepresentation.GrabThisGuy(__instance.handedness, objectToAttach);
                                 }
+                                else
+                                {
+                                    if (HandVariables.rHandJoint != null)
+                                    {
+                                        GameObject.Destroy(HandVariables.rHandJoint);
+                                    }
 
-                                HandJoints.rHandJoint = __instance.gameObject.AddComponent<FixedJoint>();
-                                HandJoints.rHandJoint.connectedBody = objectToAttach.GetComponent<Rigidbody>();
-                                HandJoints.rHandJoint.breakForce = Single.PositiveInfinity;
-                                HandJoints.rHandJoint.breakTorque = Single.PositiveInfinity;
+                                    HandVariables.rHandJoint = __instance.gameObject.AddComponent<FixedJoint>();
+                                    HandVariables.rHandJoint.connectedBody = objectToAttach.GetComponent<Rigidbody>();
+                                    HandVariables.rHandJoint.breakForce = Single.PositiveInfinity;
+                                    HandVariables.rHandJoint.breakTorque = Single.PositiveInfinity;
+                                }
                             }
 
                             if (__instance.handedness == Handedness.LEFT)
                             {
-                                if (HandJoints.lHandJoint != null)
+                                if (Utils.Utils.CanPickup(playerRepresentation))
                                 {
-                                    GameObject.Destroy(HandJoints.lHandJoint);
+                                    MelonLogger.Msg("Can pickup this player.");
+                                    playerRepresentation.GrabThisGuy(__instance.handedness, objectToAttach);
                                 }
+                                else
+                                {
+                                    if (HandVariables.lHandJoint != null)
+                                    {
+                                        GameObject.Destroy(HandVariables.lHandJoint);
+                                    }
 
-                                HandJoints.lHandJoint = __instance.gameObject.AddComponent<FixedJoint>();
-                                HandJoints.lHandJoint.connectedBody = objectToAttach.GetComponent<Rigidbody>();
-                                HandJoints.lHandJoint.breakForce = Single.PositiveInfinity;
-                                HandJoints.lHandJoint.breakTorque = Single.PositiveInfinity;
+                                    HandVariables.lHandJoint = __instance.gameObject.AddComponent<FixedJoint>();
+                                    HandVariables.lHandJoint.connectedBody = objectToAttach.GetComponent<Rigidbody>();
+                                    HandVariables.lHandJoint.breakForce = Single.PositiveInfinity;
+                                    HandVariables.lHandJoint.breakTorque = Single.PositiveInfinity;
+                                }
                             }
                         }
 
                         DebugLogger.Msg("Grabbed: " + objectToAttach.name);
-                        MelonCoroutines.Start(PatchCoroutines.WaitForAttachSync(objectToAttach));
+                        MelonCoroutines.Start(PatchCoroutines.WaitForAttachSync(objectToAttach, __instance.handedness, true));
                     }
                 }
             }
@@ -547,7 +715,7 @@ namespace BonelabMultiplayerMockup.Patches
                 {
                     if (!(__instance.pullCoroutine != null && !__state))
                         return;
-                    MelonCoroutines.Start(PatchCoroutines.WaitForAttachSync(__instance.gameObject));
+                    MelonCoroutines.Start(PatchCoroutines.WaitForAttachSync(__instance.gameObject, hand.handedness, false));
                 }
             }
         }
