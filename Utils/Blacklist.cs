@@ -6,7 +6,7 @@ namespace BonelabMultiplayerMockup.Utils
         {
             if (path.Contains("[RigManager (Blank)]")) return true;
             if (path.ToLower().Contains("(playerrep)")) return true;
-            if (path.ToLower().StartsWith("cartridge")) return true;
+            if (path.ToLower().Contains("cartridge")) return true;
 
             return false;
         }

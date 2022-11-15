@@ -399,6 +399,7 @@
         <Compile Include="Extention\QuaternionExtensions.cs" />
         <Compile Include="MelonLoaderMod.cs" />
         <Compile Include="NetworkData\CompressedTransform.cs" />
+        <Compile Include="NetworkData\BytePosition.cs" />
         <Compile Include="Nodes\Client.cs" />
         <Compile Include="Nodes\Node.cs" />
         <Compile Include="Nodes\Server.cs" />
@@ -406,6 +407,7 @@
         <Compile Include="Object\SyncedObject.cs" />
         <Compile Include="Packets\DebugAssistance.cs" />
         <Compile Include="Packets\Gun\BalloonGunFirePacket.cs" />
+        <Compile Include="Packets\Gun\ConstrainerGunJointPacket.cs" />
         <Compile Include="Packets\Gun\GunStatePacket.cs" />
         <Compile Include="Packets\Gun\MagInsertPacket.cs" />
         <Compile Include="Packets\Object\GrabStatePacket.cs" />
@@ -414,6 +416,7 @@
         <Compile Include="Packets\Object\NpcDeathPacket.cs" />
         <Compile Include="Packets\Object\OwnerChangePacket.cs" />
         <Compile Include="Packets\Object\SimpleGripEventPacket.cs" />
+        <Compile Include="Packets\Object\SpawnRequestPacket.cs" />
         <Compile Include="Packets\Object\TransformUpdatePacket.cs" />
         <Compile Include="Packets\PacketHandler.cs" />
         <Compile Include="Packets\NetworkPacket.cs" />
@@ -434,6 +437,9 @@
         <Compile Include="Packets\Player\ShortIdPacket.cs" />
         <Compile Include="Packets\Reset\LoadedLevelResponsePacket.cs" />
         <Compile Include="Packets\Reset\SyncResetPacket.cs" />
+        <Compile Include="Packets\World\GameControlPacket.cs" />
+        <Compile Include="Patches\ConstrainerGunPatches.cs" />
+        <Compile Include="Patches\GameControlPatches.cs" />
         <Compile Include="Patches\Patches.cs" />
         <Compile Include="Properties\AssemblyInfo.cs" />
         <Compile Include="Representations\PlayerRepresentation.cs" />

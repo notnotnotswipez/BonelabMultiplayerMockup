@@ -3,12 +3,14 @@ using BoneLib;
 using SLZ.Marrow.Data;
 using SLZ.Marrow.Pool;
 using SLZ.Marrow.Warehouse;
+using SLZ.Props.Weapons;
 using UnityEngine;
 
 namespace BonelabMultiplayerMockup.Utils
 {
     public class PoolManager
     {
+        public static int spawnedObjects = 0;
         public static AssetPool GetAssetPool(string barcode)
         {
             foreach (var pair in AssetSpawner._instance._barcodeToPool)
@@ -77,8 +79,12 @@ namespace BonelabMultiplayerMockup.Utils
             Action<GameObject> action = new Action<GameObject>(o =>
             {
                 GameObject copy = GameObject.Instantiate(o);
+                copy.name += " " + spawnedObjects++;
                 copy.transform.position = position;
                 copy.transform.rotation = rotation;
+
+                // Hopefully makes things removable with the spawn gun? Might cause unrelated issues.
+                // AssetPoolee assetPoolee = copy.AddComponent<AssetPoolee>();
                 onSpawn.Invoke(copy);
             });
             gameObjectCrate.LoadAsset(action);            

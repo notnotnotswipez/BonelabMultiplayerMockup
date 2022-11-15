@@ -168,6 +168,14 @@ namespace BonelabMultiplayerMockup.Representations
             for (var i = 0; i < childCount; i++)
             {
                 var child = parent.GetChild(i).gameObject;
+                if (currentBoneId == 254)
+                {
+                    if (!boneDictionary.ContainsKey(254))
+                    {
+                        boneDictionary.Add(currentBoneId, new InterpolatedObject(child));
+                    }
+                    return;
+                }
                 boneDictionary.Add(currentBoneId++, new InterpolatedObject(child));
 
                 if (child.transform.childCount > 0) PopulateBoneDictionary(child.transform);
@@ -318,6 +326,7 @@ namespace BonelabMultiplayerMockup.Representations
 
         private void AddCorrectProperties(GameObject gameObject, Collider collider, GenericGrip genericGripOriginal)
         {
+            if (gameObject == null) return;
             gameObject.layer = LayerMask.NameToLayer("Interactable");
             
             ImpactProperties impactProperties = gameObject.AddComponent<ImpactProperties>();
@@ -572,10 +581,13 @@ namespace BonelabMultiplayerMockup.Representations
                 if (selectedBone != null)
                 {
                     if (selectedBone.go != null){
-                        Quaternion rotation = pelvis.transform.rotation.Add(compressedTransform.rotation);
-                        Vector3 position = pelvis.transform.position + compressedTransform.position;
+                        if (pelvis != null)
+                        {
+                            Quaternion rotation = pelvis.transform.rotation.Add(compressedTransform.rotation);
+                            Vector3 position = pelvis.transform.position + compressedTransform.position;
 
-                        selectedBone.UpdateTarget(position, rotation, true);
+                            selectedBone.UpdateTarget(position, rotation, true);
+                        }
                     }
                 }
             }
@@ -596,6 +608,8 @@ namespace BonelabMultiplayerMockup.Representations
         public void updateColliderTransform(byte colliderId, CompressedTransform compressedTransform)
         {
             if (playerRep == null) return;
+
+            if (pelvis == null) return;
 
             if (colliderDictionary.ContainsKey(colliderId))
             {

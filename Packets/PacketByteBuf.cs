@@ -37,6 +37,28 @@ namespace BonelabMultiplayerMockup.Packets
             return getBytes()[byteIndex++];
         }
 
+        public BytePosition ReadBytePosition()
+        {
+            var positionBytes = new List<byte>();
+            var finalIndex = byteIndex + BytePosition.length;
+            int times = 0;
+            for (var i = byteIndex; i < finalIndex; i++)
+            {
+                if (i >= bytes.Length)
+                {
+                    break;
+                }
+
+                positionBytes.Add(getBytes()[i]);
+                times++;
+            }
+
+            var bytePos = new BytePosition(positionBytes.ToArray());
+            byteIndex += times;
+
+            return bytePos;
+        }
+
         public CompressedTransform ReadCompressedTransform()
         {
             try
@@ -67,6 +89,11 @@ namespace BonelabMultiplayerMockup.Packets
         public void WriteCompressedTransform(CompressedTransform compressedTransform)
         {
             foreach (var b in compressedTransform.GetBytes()) byteList.Add(b);
+        }
+        
+        public void WriteBytePosition(BytePosition bytePosition)
+        {
+            foreach (var b in bytePosition.GetBytes()) byteList.Add(b);
         }
 
         public string ReadString()

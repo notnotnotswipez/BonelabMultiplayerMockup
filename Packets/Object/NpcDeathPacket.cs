@@ -1,4 +1,5 @@
 using BonelabMultiplayerMockup.Object;
+using BonelabMultiplayerMockup.Patches;
 using BonelabMultiplayerMockup.Utils;
 using SLZ.AI;
 using UnityEngine.SceneManagement;
@@ -25,6 +26,7 @@ namespace BonelabMultiplayerMockup.Packets.Object
                 AIBrain aiBrain = PoolManager.GetComponentOnObject<AIBrain>(syncedObject.gameObject);
                 if (aiBrain != null)
                 {
+                    PatchVariables.shouldIgnoreNPCDeath = true;
                     aiBrain.puppetMaster.Kill();
                 }
             }

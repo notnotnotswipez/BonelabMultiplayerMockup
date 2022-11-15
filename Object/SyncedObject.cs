@@ -12,6 +12,7 @@ using Il2CppSystem.Numerics;
 using MelonLoader;
 using SLZ.AI;
 using SLZ.Marrow.Pool;
+using SLZ.Props.Weapons;
 using UnityEngine;
 
 namespace BonelabMultiplayerMockup.Object
@@ -22,6 +23,7 @@ namespace BonelabMultiplayerMockup.Object
         public static List<GameObject> tempActiveObjects = new List<GameObject>();
 
         public static Dictionary<ushort, SyncedObject> syncedObjectIds = new Dictionary<ushort, SyncedObject>();
+        public static Dictionary<ushort, GameObject> cachedSpawnedObjects = new Dictionary<ushort, GameObject>();
         public static List<GameObject> syncedObjects = new List<GameObject>();
 
         public static Dictionary<ushort, List<SyncedObject>> relatedSyncedObjects =
@@ -32,8 +34,8 @@ namespace BonelabMultiplayerMockup.Object
 
         public static ushort lastId;
         public static ushort lastGroupId;
-        private Rigidbody _rigidbody;
-        public bool spawnedObject;
+        public Rigidbody _rigidbody;
+        public bool spawnedObject = false;
 
         public Vector3 lastPosition;
         public Quaternion lastRotation;
@@ -41,7 +43,9 @@ namespace BonelabMultiplayerMockup.Object
         public bool isGrabbed = false;
         public ushort currentId;
         public ushort groupId;
+        public ushort originalGroupId;
         public long firstEverOwner = 0;
+        public SyncedObject storedMag;
 
         public bool isNpc = false;
         public static Dictionary<ushort, Rigidbody> npcWithRoots = new Dictionary<ushort, Rigidbody>();
@@ -106,6 +110,69 @@ namespace BonelabMultiplayerMockup.Object
             }
             
             PopulateGripEvents();
+        }
+
+        public void OnDisable()
+        {
+            syncedObjects.Remove(gameObject);
+            syncedObjectIds.Remove(currentId);
+            if (npcWithRoots.ContainsKey(groupId))
+            {
+                npcWithRoots.Remove(groupId);
+            }
+            
+            if (IsClientSimulated())
+            {
+                if (!totalRemovedGroups.Contains(groupId))
+                {
+                    totalRemovedGroups.Add(groupId);
+                    GroupDestroyData groupDestroyData = new GroupDestroyData()
+                    {
+                        groupId = groupId,
+                        backupObjectId = lastId
+                    };
+
+                    PacketByteBuf message =
+                        PacketHandler.CompressMessage(NetworkMessageType.GroupDestroyPacket, groupDestroyData);
+                    Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, message.getBytes());
+                }
+            }
+            Destroy(this);
+            if (relatedSyncedObjects.ContainsKey(groupId))
+            {
+                var objects = relatedSyncedObjects[groupId];
+                objects.Remove(this);
+                relatedSyncedObjects[groupId] = objects;
+            }
+        }
+
+        public SyncedObject Transfer(GameObject gameObject)
+        {
+            SyncedObject syncedObject = gameObject.AddComponent<SyncedObject>();
+            syncedObject.currentId = currentId;
+            syncedObject.groupId = groupId;
+            syncedObject.originalGroupId = originalGroupId;
+            syncedObjects.Add(gameObject);
+            syncedObjects.Remove(this.gameObject);
+            if (relatedSyncedObjects.ContainsKey(groupId))
+            {
+                var otherSynced = relatedSyncedObjects[groupId];
+                if (!otherSynced.Contains(syncedObject)) otherSynced.Add(syncedObject);
+                otherSynced.Remove(this);
+                relatedSyncedObjects[groupId] = otherSynced;
+            }
+            else
+            {
+                var otherSynced = new List<SyncedObject>();
+                otherSynced.Add(syncedObject);
+                relatedSyncedObjects.Add(groupId, otherSynced);
+            }
+
+            syncedObjectIds[currentId] = syncedObject;
+            Destroy(this);
+            Destroy(this.gameObject);
+
+            return syncedObject;
         }
 
         public void SetGrabbed(bool grabbed)
@@ -211,10 +278,18 @@ namespace BonelabMultiplayerMockup.Object
             Dictionary<Vector3, ushort> groupIdsFlipped = new Dictionary<Vector3, ushort>();
             foreach (var pair in npcWithRoots)
             {
-                SyncedObject syncedObject = pair.Value.gameObject.GetComponent<SyncedObject>();
-                if (syncedObject.IsClientSimulated() && !syncedObject._rigidbody.IsSleeping())
+                if (pair.Value != null)
                 {
-                    groupIdsFlipped.Add(pair.Value.transform.position, pair.Key);
+                    SyncedObject syncedObject = pair.Value.gameObject.GetComponent<SyncedObject>();
+                    if (syncedObject != null)
+                    {
+                        if (syncedObject.IsClientSimulated() && !syncedObject._rigidbody.IsSleeping())
+                        {
+                            if (!groupIdsFlipped.ContainsKey(pair.Value.transform.position)){
+                                groupIdsFlipped.Add(pair.Value.transform.position, pair.Key);
+                            }
+                        }
+                    }
                 }
             }
 
@@ -434,6 +509,7 @@ namespace BonelabMultiplayerMockup.Object
                 userId = userId,
                 objectId = currentId
             };
+            
             var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.OwnerChangePacket,
                 ownerQueueChangeData);
             Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, packetByteBuf.getBytes());
@@ -481,6 +557,7 @@ namespace BonelabMultiplayerMockup.Object
                     }
                 }
 
+            cachedSpawnedObjects.Clear();
             syncedObjectIds.Clear();
             syncedObjects.Clear();
             relatedSyncedObjects.Clear();
@@ -517,63 +594,23 @@ namespace BonelabMultiplayerMockup.Object
             return false;
         }
 
-        public static void MakeSyncedObject(GameObject gameObject, ushort objectId, long ownerId, ushort groupId,
-            bool properAdd = true)
+        public static SyncedObject Sync(GameObject desiredSync, bool shouldCheckScene = true, string manualBarcode = "", long userId = 0)
         {
-            if (syncedObjects.Contains(gameObject)) return;
-
-            var syncedObject = gameObject.AddComponent<SyncedObject>();
-            // If the group ID coming in is greater than or equal to the one stored clientside, then we should set it.
-            if (properAdd)
-                if (lastGroupId <= groupId)
-                {
-                    lastGroupId = groupId;
-                    lastGroupId++;
-                }
-
-            if (relatedSyncedObjects.ContainsKey(groupId))
-            {
-                var otherSynced = relatedSyncedObjects[groupId];
-                if (!otherSynced.Contains(syncedObject))
-                {
-                    otherSynced.Add(syncedObject);
-                    DebugLogger.Msg("Added related sync in group ID: " + groupId);
-                }
-
-                relatedSyncedObjects[groupId] = otherSynced;
-            }
-            else
-            {
-                var otherSynced = new List<SyncedObject>();
-                otherSynced.Add(syncedObject);
-                relatedSyncedObjects.Add(groupId, otherSynced);
-                DebugLogger.Msg("Added related sync in group ID: " + groupId);
-            }
-
-            syncedObjects.Add(gameObject);
-            syncedObject.SetOwner(ownerId);
-            syncedObject.currentId = objectId;
-            syncedObject.groupId = groupId;
-
-
-
-            DebugLogger.Msg("Made sync object for: " + gameObject.name + ", with an ID of: " + objectId +
-                            ", and group ID of: " + groupId);
-            DebugLogger.Msg("Owner: " + ownerId);
-
-            syncedObjectIds.Add(objectId, syncedObject);
-        }
-
-        public static void Sync(GameObject desiredSync)
-        {
-            if (!DiscordIntegration.hasLobby) return;
+            if (!DiscordIntegration.hasLobby) return null;
 
             if (isSyncedObject(desiredSync) || syncedObjects.Contains(desiredSync))
             {
-                return;
+                return null;
             }
 
-            if (Blacklist.isBlacklisted(GetGameObjectPath(desiredSync.gameObject))) return;
+            if (Blacklist.isBlacklisted(GetGameObjectPath(desiredSync.gameObject))) return null;
+
+            long desiredId = DiscordIntegration.currentUser.Id;
+
+            if (userId != 0)
+            {
+                desiredId = userId;
+            }
 
             var groupId = GetGroupId();
             ushort startingId = lastId;
@@ -587,22 +624,28 @@ namespace BonelabMultiplayerMockup.Object
                     hasBroadcasted = true;
                 }
 
-                FutureProofSync(rigidbody.gameObject, groupId, DiscordIntegration.currentUser.Id);
+                FutureProofSync(rigidbody.gameObject, groupId, desiredId);
             }
 
             ushort finalId = lastId;
+            string sentBarcode = PoolManager.GetSpawnableBarcode(desiredSync);
+            if (manualBarcode != "")
+            {
+                sentBarcode = manualBarcode;
+            }
 
             if (main != null)
             {
                 string syncObject = GetGameObjectPath(main);
                 var initializeSyncData = new InitializeSyncData
                 {
-                    userId = DiscordIntegration.currentUser.Id,
+                    userId = desiredId,
                     objectId = startingId,
+                    checkInScene = shouldCheckScene,
                     finalId = finalId,
                     objectName = syncObject,
                     groupId = groupId,
-                    barcode = PoolManager.GetSpawnableBarcode(desiredSync)
+                    barcode = sentBarcode
                 };
 
                 var packetByteBuf =
@@ -615,6 +658,7 @@ namespace BonelabMultiplayerMockup.Object
             }
 
             DebugLogger.Msg("Synced or atleast got to finish syncing " + desiredSync.name);
+            return GetSyncedComponent(desiredSync);
         }
 
         public void AddToSyncGroup(SyncedObject syncedObject)
@@ -623,20 +667,67 @@ namespace BonelabMultiplayerMockup.Object
             DebugLogger.Msg("Transferred group of " + syncedObject.gameObject.name + " to group: " + groupId);
         }
 
-        public void TransferGroup(ushort newGroupId)
+        public void TransferGroup(ushort newGroupId, bool fullSearch = true)
         {
-            var otherSynced = relatedSyncedObjects[groupId];
-            otherSynced.Remove(this);
-            relatedSyncedObjects[groupId] = otherSynced;
+            DebugLogger.Msg("Called transfer from group id: "+groupId+", to: "+newGroupId);
+            if (groupId == newGroupId) return;
+            if (!relatedSyncedObjects.ContainsKey(groupId)) return;
 
-            var newList = relatedSyncedObjects[newGroupId];
-            if (!newList.Contains(this))
+            ushort originalGroupId = groupId;
+
+            if (fullSearch)
             {
-                newList.Add(this);
+                foreach (var allSynced in relatedSyncedObjects[originalGroupId])
+                {
+                    var newList = new List<SyncedObject>();
+        
+                    if (relatedSyncedObjects.ContainsKey(newGroupId))
+                    {
+                        newList = relatedSyncedObjects[newGroupId];
+                    }
+                    else
+                    {
+                        relatedSyncedObjects.Add(newGroupId, newList);
+                    }
+
+                    if (!newList.Contains(allSynced))
+                    {
+                        newList.Add(allSynced);
+                    }
+                
+                    relatedSyncedObjects[newGroupId] = newList;
+                    DebugLogger.Msg("Changed group Id of: "+allSynced.gameObject.name);
+                    DebugLogger.Msg("Was: "+allSynced.originalGroupId);
+                    allSynced.groupId = newGroupId;
+                    DebugLogger.Msg("Is now: "+newGroupId);
+                }
+            }
+            else
+            {
+                var newList = new List<SyncedObject>();
+
+                if (relatedSyncedObjects.ContainsKey(newGroupId))
+                {
+                    newList = relatedSyncedObjects[newGroupId];
+                }
+                else
+                {
+                    relatedSyncedObjects.Add(newGroupId, newList);
+                }
+
+                if (!newList.Contains(this))
+                {
+                    newList.Add(this);
+                }
+                
+                relatedSyncedObjects[newGroupId] = newList;
+                DebugLogger.Msg("Changed group Id of: "+gameObject.name);
+                DebugLogger.Msg("Was: "+originalGroupId);
+                groupId = newGroupId;
+                DebugLogger.Msg("Is now: "+groupId);
             }
 
-            relatedSyncedObjects[newGroupId] = newList;
-            groupId = newGroupId;
+            relatedSyncedObjects.Remove(originalGroupId);
         }
 
         public void Update()
@@ -678,78 +769,8 @@ namespace BonelabMultiplayerMockup.Object
 
             syncedObject.SetOwner(ownerId);
             syncedObject.groupId = groupId;
+            syncedObject.originalGroupId = groupId;
             syncedObject.currentId = syncedId;
-            syncedObjects.Add(gameObject);
-            if (!syncedObjectIds.ContainsKey(syncedId)) syncedObjectIds.Add(syncedId, syncedObject);
-        }
-
-        public static void ManualClientSync(GameObject gameObject, ushort groupId, long ownerId, ushort objectId)
-        {
-            if (gameObject.GetComponent<SyncedObject>())
-            {
-                return;
-            }
-
-            if (lastGroupId <= groupId)
-            {
-                lastGroupId = groupId;
-                lastGroupId++;
-            }
-
-            var syncedId = objectId;
-
-            var syncedObject = gameObject.AddComponent<SyncedObject>();
-            if (relatedSyncedObjects.ContainsKey(groupId))
-            {
-                var otherSynced = relatedSyncedObjects[groupId];
-                if (!otherSynced.Contains(syncedObject)) otherSynced.Add(syncedObject);
-                relatedSyncedObjects[groupId] = otherSynced;
-            }
-            else
-            {
-                var otherSynced = new List<SyncedObject>();
-                otherSynced.Add(syncedObject);
-                relatedSyncedObjects.Add(groupId, otherSynced);
-            }
-
-            syncedObject.SetOwner(ownerId);
-            syncedObject.groupId = groupId;
-            syncedObject.currentId = syncedId;
-            syncedObjects.Add(gameObject);
-            if (!syncedObjectIds.ContainsKey(syncedId)) syncedObjectIds.Add(syncedId, syncedObject);
-        }
-
-        private static void BroadcastSyncData(GameObject gameObject, ushort groupId)
-        {
-            if (syncedObjects.Contains(gameObject)) return;
-
-            var syncObject = GetGameObjectPath(gameObject);
-            // We add this after, just incase someone else syncs and object that matches, this should never ever be looked for. Since its already synced.
-
-            DebugLogger.Msg("Attempting to sync object, base path is: " + syncObject);
-
-            var syncedId = GetSyncId();
-            DebugLogger.Msg("Sync ID: " + syncedId);
-
-
-            var syncedObject = gameObject.AddComponent<SyncedObject>();
-            if (relatedSyncedObjects.ContainsKey(groupId))
-            {
-                var otherSynced = relatedSyncedObjects[groupId];
-                if (!otherSynced.Contains(syncedObject)) otherSynced.Add(syncedObject);
-
-                relatedSyncedObjects[groupId] = otherSynced;
-            }
-            else
-            {
-                var otherSynced = new List<SyncedObject>();
-                otherSynced.Add(syncedObject);
-                relatedSyncedObjects.Add(groupId, otherSynced);
-            }
-
-            syncedObject.groupId = groupId;
-            syncedObject.currentId = syncedId;
-            syncedObject.SetOwner(DiscordIntegration.currentUser.Id);
             syncedObjects.Add(gameObject);
             if (!syncedObjectIds.ContainsKey(syncedId)) syncedObjectIds.Add(syncedId, syncedObject);
         }
@@ -767,22 +788,6 @@ namespace BonelabMultiplayerMockup.Object
             {
                 shouldTeleport = true;
                 if (!Node.activeNode.connectedUsers.Contains(simulatorId)) SetOwner(DiscordIntegration.lobby.OwnerId);
-            }
-        }
-
-        public void OnDestroy()
-        {
-            if (!totalRemovedGroups.Contains(groupId))
-            {
-                totalRemovedGroups.Add(groupId);
-                GroupDestroyData groupDestroyData = new GroupDestroyData()
-                {
-                    groupId = groupId,
-                    backupObjectId = currentId
-                };
-
-                PacketByteBuf message = PacketHandler.CompressMessage(NetworkMessageType.GroupDestroyPacket, groupDestroyData);
-                Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, message.getBytes());   
             }
         }
 

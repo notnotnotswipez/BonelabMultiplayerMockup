@@ -57,6 +57,7 @@ namespace BonelabMultiplayerMockup.Packets.Gun
                     AmmoSocket ammoSocket = PoolManager.GetComponentOnObject<AmmoSocket>(syncedObject.gameObject);
                     if (state == 0)
                     {
+                        gun.EjectCartridge();
                         if (ammoSocket.hasMagazine)
                         {
                             ammoSocket._magazinePlug.magazine.magazineState.Refill();
@@ -65,7 +66,6 @@ namespace BonelabMultiplayerMockup.Packets.Gun
                         {
                             gun.InstantLoad(); 
                         }
-                        
                         gun.CeaseFire();
                         gun.Charge();
                         gun.Fire();
@@ -78,11 +78,14 @@ namespace BonelabMultiplayerMockup.Packets.Gun
                     {
                         if (gun.HasMagazine())
                         {
-                            //PoolManager.GetComponentOnObject<AmmoSocket>(gun.gameObject).EjectMagazine();
+                            PoolManager.GetComponentOnObject<AmmoSocket>(gun.gameObject).EjectMagazine();
+                            if (syncedObject.storedMag != null)
+                            {
+                                syncedObject.storedMag.TransferGroup(syncedObject.storedMag.originalGroupId, false);
+                                syncedObject.storedMag = null;
+                            }
                         }
                     }
-
-                    //MelonCoroutines.Start(IgnoreGunReference());
                 }
             }
         }

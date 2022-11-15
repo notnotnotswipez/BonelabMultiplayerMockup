@@ -2,6 +2,8 @@ using BonelabMultiplayerMockup.Object;
 using BonelabMultiplayerMockup.Patches;
 using BonelabMultiplayerMockup.Utils;
 using MelonLoader;
+using SLZ.Interaction;
+using SLZ.Props.Weapons;
 using UnityEngine;
 
 namespace BonelabMultiplayerMockup.Packets.Gun
@@ -29,23 +31,17 @@ namespace BonelabMultiplayerMockup.Packets.Gun
             
             if (gunSynced && magSynced)
             {
-                PatchVariables.shouldIgnoreGunEvents = true;
-                MelonLogger.Msg("Mag inserted!");
-                
                 SLZ.Props.Weapons.Gun gun = PoolManager.GetComponentOnObject<SLZ.Props.Weapons.Gun>(gunSynced.gameObject);
-                gun.InstantLoad();
-                gun.CeaseFire();
-                gun.Charge();
-
-                magSynced.DestroySyncable(false);
-                if (magSynced.spawnedObject)
+                if (gun)
                 {
-                    Transform parent = magSynced.transform;
-                    while (parent.parent != null)
+                    Magazine magazine = PoolManager.GetComponentOnObject<Magazine>(magSynced.gameObject);
+                    if (magazine)
                     {
-                        parent = parent.parent;
+                        gun.InstantLoad();
+                        gun.CeaseFire();
+                        gun.Charge();
+                        GameObject.Destroy(magazine.gameObject);
                     }
-                    GameObject.Destroy(parent);
                 }
             }
         }

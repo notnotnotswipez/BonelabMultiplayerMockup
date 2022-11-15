@@ -1,8 +1,10 @@
 using System.Collections.Generic;
+using System.Linq;
 using BonelabMultiplayerMockup.NetworkData;
 using BonelabMultiplayerMockup.Object;
 using BonelabMultiplayerMockup.Utils;
 using MelonLoader;
+using SLZ.Marrow.Pool;
 using UnityEngine;
 
 namespace BonelabMultiplayerMockup.Packets.Object
@@ -25,44 +27,27 @@ namespace BonelabMultiplayerMockup.Packets.Object
             ushort groupId = packetByteBuf.ReadUShort();
             ushort backupObjectId = packetByteBuf.ReadUShort();
             SyncedObject backup = SyncedObject.GetSyncedObject(backupObjectId);
-            if (backup)
+
+            if (SyncedObject.npcWithRoots.ContainsKey(groupId))
             {
-                groupId = backup.groupId;
+                SyncedObject.npcWithRoots.Remove(groupId);
             }
 
-            if (!SyncedObject.relatedSyncedObjects.ContainsKey(groupId))
-            {
-                return;
-            }
+            GameObject gameObject = SyncedObject.cachedSpawnedObjects[groupId];
 
-            List<SyncedObject> syncedObjectsToRemove = new List<SyncedObject>();
-            for (int i = 0; i < SyncedObject.relatedSyncedObjects[groupId].Count; i++) {
-                syncedObjectsToRemove.Add(SyncedObject.relatedSyncedObjects[groupId][i]);
-            }
-
-            for (int i = 0; i < syncedObjectsToRemove.Count; i++)
+            if (gameObject)
             {
-                SyncedObject syncedObject = syncedObjectsToRemove[i];
-                if (syncedObject != null)
+                GameObject.Destroy(gameObject);
+                SyncedObject.cachedSpawnedObjects.Remove(groupId);
+            }
+            else
+            {
+                AssetPoolee poolee = PoolManager.GetComponentOnObject<AssetPoolee>(backup.gameObject);
+                if (poolee)
                 {
-                    syncedObject.UpdateObject(new CompressedTransform(new Vector3(0, 100, 0), Quaternion.identity));
-                    syncedObject.DestroySyncable(false);
-                    if (syncedObject.spawnedObject)
-                    {
-                        Transform parent = syncedObject.transform;
-                        while (parent.parent != null)
-                        {
-                            parent = parent.parent;
-                        }
-                        GameObject.Destroy(parent);
-                    }
+                    poolee.Despawn();
                 }
             }
-            syncedObjectsToRemove.Clear();
-
-            SyncedObject.queuedObjectsToDelete.Remove(groupId);
-            DebugLogger.Msg("Destroyed group Id: "+groupId);
-            DebugLogger.Msg("Size: "+SyncedObject.queuedObjectsToDelete.Count);
         }
     }
 

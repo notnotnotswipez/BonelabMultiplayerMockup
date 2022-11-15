@@ -31,7 +31,7 @@ namespace BonelabMultiplayerMockup
         public const string Name = "BonelabMultiplayerMockup"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "notnotnotswipez"; // Author of the Mod.  (Set as null if none)
         public const string Company = null; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "5.0.0"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "6.0.0"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = null; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -43,7 +43,7 @@ namespace BonelabMultiplayerMockup
         private static byte currentBoneId = 0;
         private static byte currentColliderId = 0;
         private int updateCount = 0;
-        private int desiredFrames = 3;
+        private int desiredFrames = 2;
         private static float currentStall = 1;
         public static string sceneName = "";
         public static bool waitingForSceneLoad = false;
@@ -146,6 +146,14 @@ namespace BonelabMultiplayerMockup
             for (var i = 0; i < childCount; i++)
             {
                 var child = parent.GetChild(i).gameObject;
+                if (currentBoneId == 254)
+                {
+                    if (!boneDictionary.ContainsKey(254))
+                    {
+                        boneDictionary.Add(currentBoneId, child);
+                    }
+                    return;
+                }
                 boneDictionary.Add(currentBoneId++, child);
 
                 if (child.transform.childCount > 0) PopulateBoneDictionary(child.transform);
@@ -210,23 +218,6 @@ namespace BonelabMultiplayerMockup
                         // Send packet to the lobby owner saying we loaded into the scene
                         var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.LevelResponsePacket, new LoadedLevelResponseData());
                         Node.activeNode.SendMessage(DiscordIntegration.lobby.OwnerId, (byte)NetworkChannel.Reliable, catchupBuff.getBytes());
-                    }
-                    else
-                    {
-                        DebugLogger.Msg("Loaded a new scene zone!");
-                        MelonCoroutines.Start(PatchCoroutines.WaitForAvatarSwitch());
-                        if (DiscordIntegration.isHost)
-                        {
-                            var syncResetData = new SyncResetData()
-                            {
-                                // empty data
-                            };
-                            PacketByteBuf packetByteBuf =
-                                PacketHandler.CompressMessage(NetworkMessageType.SyncResetPacket, syncResetData);
-                            Node.activeNode.BroadcastMessage((byte)NetworkChannel.Transaction ,packetByteBuf.getBytes());
-                        
-                            SyncedObject.CleanData(true);
-                        }
                     }
                 }
             }

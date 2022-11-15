@@ -36,6 +36,7 @@ namespace BonelabMultiplayerMockup.Patches
         public static bool shouldIgnoreGrabbing = false;
         public static bool shouldIgnoreGunEvents = false;
         public static bool shouldIgnoreAvatarSwitch = false;
+        public static bool shouldIgnoreNPCDeath = false;
     }
 
     public class PatchCoroutines
@@ -44,33 +45,58 @@ namespace BonelabMultiplayerMockup.Patches
         {
             yield return new WaitForSecondsRealtime(1f);
 
-            var swapAvatarMessageData = new AvatarChangeData()
+            try
             {
-                userId = DiscordIntegration.currentUser.Id,
-                barcode = Player.GetRigManager().GetComponentInChildren<RigManager>()._avatarCrate._barcode._id
-            };
-            var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.AvatarChangePacket,
-                swapAvatarMessageData);
-            Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, packetByteBuf.getBytes());
-            BonelabMultiplayerMockup.PopulateCurrentAvatarData();
-            if (BonelabMultiplayerMockup.debugRep != null)
+                var swapAvatarMessageData = new AvatarChangeData()
+                {
+                    userId = DiscordIntegration.currentUser.Id,
+                    barcode = Player.GetRigManager().GetComponentInChildren<RigManager>()._avatarCrate._barcode._id
+                };
+                var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.AvatarChangePacket,
+                    swapAvatarMessageData);
+                Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, packetByteBuf.getBytes());
+                BonelabMultiplayerMockup.PopulateCurrentAvatarData();
+                if (BonelabMultiplayerMockup.debugRep != null)
+                {
+                    BonelabMultiplayerMockup.debugRep.SetAvatar(Player.GetRigManager().GetComponentInChildren<RigManager>()
+                        ._avatarCrate._barcode._id);
+                }
+            }
+            catch (Exception e)
             {
-                BonelabMultiplayerMockup.debugRep.SetAvatar(Player.GetRigManager().GetComponentInChildren<RigManager>()._avatarCrate._barcode._id);
+                // Ignore.
             }
         }
 
-        public static IEnumerator WaitForNPCSync(GameObject npc)
+        public static IEnumerator WaitForSpawnSync(GameObject npc)
         {
             yield return new WaitForSecondsRealtime(2);
             SyncedObject syncedObject = SyncedObject.GetSyncedComponent(npc);
             if (syncedObject == null)
             {
-                SyncedObject.Sync(npc);
+                SyncedObject.Sync(npc, false);
             }
             else
             {
-                syncedObject.BroadcastOwnerChange();
+                syncedObject.ManualSetOwner(DiscordIntegration.currentUser.Id, false);
             }
+        }
+
+        public static IEnumerator WaitForSpawnRequest(AssetPoolee poolee)
+        {
+            var spawnRequestData = new SpawnRequestData()
+            {
+                userId = DiscordIntegration.currentUser.Id,
+                position = new BytePosition(poolee.gameObject.transform.position),
+                barcode = poolee.spawnableCrate._barcode
+            };
+
+            PacketByteBuf packetByteBuf =
+                PacketHandler.CompressMessage(NetworkMessageType.SpawnRequestPacket, spawnRequestData);
+            
+            Node.activeNode.SendMessage(DiscordIntegration.lobby.OwnerId, (byte)NetworkChannel.Transaction, packetByteBuf.getBytes());
+            poolee.Despawn();
+            yield break;
         }
 
         public static IEnumerator WaitForAttachSync(GameObject toSync, Handedness hand, bool setCacheGrabbed)
@@ -80,10 +106,10 @@ namespace BonelabMultiplayerMockup.Patches
             if (syncedObject == null)
             {
                 SyncedObject.Sync(toSync);
-                
+
                 // Get the component again
                 syncedObject = SyncedObject.GetSyncedComponent(toSync);
-                
+
                 // Could have been blacklisted.
                 if (syncedObject != null)
                 {
@@ -105,6 +131,7 @@ namespace BonelabMultiplayerMockup.Patches
                                 HandVariables.rSyncedObject = syncedObject;
                             }
                         }
+
                         if (hand == Handedness.LEFT)
                         {
                             if (HandVariables.rSyncedObject != null)
@@ -125,7 +152,7 @@ namespace BonelabMultiplayerMockup.Patches
             else
             {
                 syncedObject.BroadcastOwnerChange();
-                
+
                 if (setCacheGrabbed)
                 {
                     syncedObject.BroadcastGrabState(true);
@@ -143,6 +170,7 @@ namespace BonelabMultiplayerMockup.Patches
                             HandVariables.rSyncedObject = syncedObject;
                         }
                     }
+
                     if (hand == Handedness.LEFT)
                     {
                         if (HandVariables.rSyncedObject != null)
@@ -169,6 +197,7 @@ namespace BonelabMultiplayerMockup.Patches
             {
                 handedSynced = HandVariables.rSyncedObject;
             }
+
             if (handedness == Handedness.LEFT)
             {
                 handedSynced = HandVariables.lSyncedObject;
@@ -182,10 +211,12 @@ namespace BonelabMultiplayerMockup.Patches
                     {
                         handedSynced.BroadcastGrabState(false);
                     }
+
                     if (handedness == Handedness.RIGHT)
                     {
                         HandVariables.rSyncedObject = null;
                     }
+
                     if (handedness == Handedness.LEFT)
                     {
                         HandVariables.lSyncedObject = null;
@@ -199,7 +230,7 @@ namespace BonelabMultiplayerMockup.Patches
     {
         public static FixedJoint lHandJoint;
         public static FixedJoint rHandJoint;
-        
+
         public static FixedJoint lRepPelvisJoint;
         public static FixedJoint rRepPelvisJoint;
 
@@ -220,20 +251,23 @@ namespace BonelabMultiplayerMockup.Patches
             {
                 if (DiscordIntegration.hasLobby)
                 {
+                    if (PatchVariables.shouldIgnoreNPCDeath)
+                    {
+                        PatchVariables.shouldIgnoreNPCDeath = false;
+                        return;
+                    }
+
                     SyncedObject syncedObject = SyncedObject.GetSyncedComponent(__instance.gameObject);
 
                     if (syncedObject)
                     {
-                        if (syncedObject.IsClientSimulated())
+                        var npcDeathData = new NpcDeathData()
                         {
-                            var npcDeathData = new NpcDeathData()
-                            {
-                                npcId = syncedObject.currentId
-                            };
-                            var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.NpcDeathPacket,
-                                npcDeathData);
-                            Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, packetByteBuf.getBytes());
-                        }
+                            npcId = syncedObject.currentId
+                        };
+                        var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.NpcDeathPacket,
+                            npcDeathData);
+                        Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, packetByteBuf.getBytes());
                     }
                 }
             }
@@ -321,6 +355,19 @@ namespace BonelabMultiplayerMockup.Patches
                         DebugLogger.Error("THIS OBJECT IS ALREADY SYNCED, THIS SHOULD BE TRANSFERRED.");
                     }
 
+                    // Nimbus and spawn gun
+                    if (__instance.spawnableCrate._barcode == "c1534c5a-6b38-438a-a324-d7e147616467" || __instance.spawnableCrate._barcode == "c1534c5a-5747-42a2-bd08-ab3b47616467")
+                    {
+                        foundSpawnGun = true;
+                    }
+
+                    bool isMag = __instance.gameObject.GetComponentInChildren<Magazine>();
+
+                    if (isMag)
+                    {
+                        // Ignore magazines. Until I find a way to spawn them on every client with bullets in them.
+                        return;
+                    }
 
                     if (!foundSpawnGun && !DiscordIntegration.isHost && isNPC)
                     {
@@ -336,14 +383,28 @@ namespace BonelabMultiplayerMockup.Patches
                             {
                                 if (foundSpawnGun || isHost)
                                 {
-                                    MelonCoroutines.Start(PatchCoroutines.WaitForNPCSync(__instance.gameObject));
+                                    if (isHost)
+                                    {
+                                        MelonCoroutines.Start(PatchCoroutines.WaitForSpawnSync(__instance.gameObject));
+                                    }
+                                    else
+                                    {
+                                        MelonCoroutines.Start(PatchCoroutines.WaitForSpawnRequest(__instance));
+                                    }
                                 }
                             }
                             else
                             {
                                 if (foundSpawnGun)
                                 {
-                                    MelonCoroutines.Start(PatchCoroutines.WaitForNPCSync(__instance.gameObject));
+                                    if (isHost)
+                                    {
+                                        MelonCoroutines.Start(PatchCoroutines.WaitForSpawnSync(__instance.gameObject));
+                                    }
+                                    else
+                                    {
+                                        MelonCoroutines.Start(PatchCoroutines.WaitForSpawnRequest(__instance));
+                                    }
                                     DebugLogger.Msg("Synced spawn gun spawned Object: " + __instance.gameObject.name);
                                 }
                             }
@@ -352,13 +413,18 @@ namespace BonelabMultiplayerMockup.Patches
                 }
             }
         }
-        
-        
+
+
         [HarmonyPatch(typeof(HandSFX), "PunchAttack", typeof(Collision), typeof(float), typeof(float))]
         public static class PunchDamagePatch
         {
             public static void Postfix(HandSFX __instance, Collision c, float impulse, float relVelSqr)
             {
+                if (!__instance._rb)
+                {
+                    return;
+                }
+                
                 GameObject collided = c.gameObject;
                 SyncedObject syncedObject = SyncedObject.GetSyncedComponent(collided);
                 if (syncedObject)
@@ -373,10 +439,12 @@ namespace BonelabMultiplayerMockup.Patches
                 {
                     return;
                 }
+
                 string playerName = collided.transform.root.name.Replace("(PlayerRep) ", "");
-                
+
                 PlayerRepresentation punchedRep = null;
-                foreach (PlayerRepresentation playerRepresentation in PlayerRepresentation.representations.Values) {
+                foreach (PlayerRepresentation playerRepresentation in PlayerRepresentation.representations.Values)
+                {
                     if (playerName == playerRepresentation.username)
                     {
                         punchedRep = playerRepresentation;
@@ -408,7 +476,12 @@ namespace BonelabMultiplayerMockup.Patches
                 {
                     return;
                 }
-                
+
+                if (!__instance._rb)
+                {
+                    return;
+                }
+
                 SyncedObject syncedObject = SyncedObject.GetSyncedComponent(__instance._rb.gameObject);
                 if (syncedObject)
                 {
@@ -419,7 +492,7 @@ namespace BonelabMultiplayerMockup.Patches
                 }
 
                 GameObject collided = c.gameObject;
-                
+
                 SyncedObject collidedSynced = SyncedObject.GetSyncedComponent(collided);
                 if (collidedSynced)
                 {
@@ -428,15 +501,17 @@ namespace BonelabMultiplayerMockup.Patches
                         collidedSynced.BroadcastOwnerChange();
                     }
                 }
-                
+
                 if (!Utils.Utils.IsPlayerPart(c.gameObject))
                 {
                     return;
                 }
+
                 string playerName = collided.transform.root.name.Replace("(PlayerRep) ", "");
-                
+
                 PlayerRepresentation punchedRep = null;
-                foreach (PlayerRepresentation playerRepresentation in PlayerRepresentation.representations.Values) {
+                foreach (PlayerRepresentation playerRepresentation in PlayerRepresentation.representations.Values)
+                {
                     if (playerName == playerRepresentation.username)
                     {
                         punchedRep = playerRepresentation;
@@ -458,11 +533,12 @@ namespace BonelabMultiplayerMockup.Patches
                 Node.activeNode.SendMessage(punchedRep.user.Id, (byte)NetworkChannel.Attack, packetByteBuf.getBytes());
             }
         }
-        
-        [HarmonyPatch(typeof(StabSlash.StabPoint), "SpawnStab", typeof(Transform), typeof(Collision), typeof(float), typeof(ImpactProperties))]
+
+        [HarmonyPatch(typeof(StabSlash.StabPoint), "SpawnStab", typeof(Transform), typeof(Collision), typeof(float),
+            typeof(ImpactProperties))]
         public static class SpawnStabPatch
         {
-            public static void Postfix(StabSlash.StabPoint __instance, 
+            public static void Postfix(StabSlash.StabPoint __instance,
                 Transform tran,
                 Collision c,
                 float stabForce,
@@ -483,7 +559,7 @@ namespace BonelabMultiplayerMockup.Patches
                 }
 
                 GameObject collided = c.gameObject;
-                
+
                 SyncedObject collidedSynced = SyncedObject.GetSyncedComponent(collided);
                 if (collidedSynced)
                 {
@@ -492,15 +568,17 @@ namespace BonelabMultiplayerMockup.Patches
                         collidedSynced.BroadcastOwnerChange();
                     }
                 }
-                
+
                 if (!Utils.Utils.IsPlayerPart(c.gameObject))
                 {
                     return;
                 }
+
                 string playerName = collided.transform.root.name.Replace("(PlayerRep) ", "");
-                
+
                 PlayerRepresentation punchedRep = null;
-                foreach (PlayerRepresentation playerRepresentation in PlayerRepresentation.representations.Values) {
+                foreach (PlayerRepresentation playerRepresentation in PlayerRepresentation.representations.Values)
+                {
                     if (playerName == playerRepresentation.username)
                     {
                         punchedRep = playerRepresentation;
@@ -523,7 +601,7 @@ namespace BonelabMultiplayerMockup.Patches
             }
         }
 
-        
+
         [HarmonyPatch(typeof(BalloonGun), "Fire")]
         private class BalloonGunFirePatch
         {
@@ -578,6 +656,79 @@ namespace BonelabMultiplayerMockup.Patches
                 }
             }
         }
+        
+        /*[HarmonyPatch(typeof(Gun), "OnMagazineInserted")]
+        private class MagEnterPatch
+        {
+            public static void Postfix(Gun __instance)
+            {
+                if (DiscordIntegration.hasLobby)
+                {
+                    AmmoPlug socket = PoolManager.GetComponentOnObject<AmmoPlug>(__instance.gameObject);
+                    SyncedObject gunSynced = SyncedObject.GetSyncedComponent(__instance.gameObject);
+                    SyncedObject magSynced = SyncedObject.GetSyncedComponent(socket.magazine.gameObject);
+
+                    if (PoolManager.GetComponentOnObject<Gun>(gunSynced.gameObject) && PoolManager.GetComponentOnObject<Magazine>(magSynced.gameObject))
+                    {
+                        if (gunSynced && magSynced)
+                        {
+                            // Allows people to put mags in other peoples guns. (IMMERSION SECTOR REFERENCE????)
+                            if (magSynced.IsClientSimulated())
+                            {
+                                // A check, if the gun is not simulated by us that means we're trying to put this mag into somebody elses gun.
+                                // Set the mags simulation owner to whoever owns the gun.
+                                // Do this before so the client is already simulating the mag when it gets requested to be inserted.
+                                if (!gunSynced.IsClientSimulated())
+                                {
+                                    magSynced.ManualSetOwner(gunSynced.simulatorId, false);
+                                }
+                                gunSynced.storedMag = magSynced;
+                                magSynced.TransferGroup(gunSynced.groupId);
+                                DebugLogger.Msg("Mag inserted into gun.");
+                                var magInsertMessageData = new MagInsertMessageData()
+                                {
+                                    gunId = gunSynced.currentId,
+                                    magId = magSynced.currentId
+                                };
+                                var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.MagInsertPacket,
+                                    magInsertMessageData);
+                                Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, packetByteBuf.getBytes());
+                            
+                                
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        [HarmonyPatch(typeof(Gun), "OnMagazineRemoved")]
+        private class MagExitPatch
+        {
+            public static void Postfix(Gun __instance)
+            {
+                if (DiscordIntegration.hasLobby)
+                {
+                    SyncedObject gunSynced = SyncedObject.GetSyncedComponent(__instance.gameObject);
+
+                    if (gunSynced)
+                    {
+                        if (gunSynced.IsClientSimulated())
+                        {
+                            DebugLogger.Msg("Mag ejected from gun.");
+                            var gunStatePacket = new GunStateData()
+                            {
+                                objectid = gunSynced.currentId,
+                                state = 2
+                            };
+                            var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.GunStatePacket,
+                                gunStatePacket);
+                            Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, packetByteBuf.getBytes());
+                        }
+                    }
+                }
+            }
+        }*/
 
         [HarmonyPatch(typeof(RigManager), "SwapAvatar", new[] { typeof(Avatar) })]
         private class AvatarSwapPatch
@@ -643,80 +794,79 @@ namespace BonelabMultiplayerMockup.Patches
                     MelonCoroutines.Start(PatchCoroutines.WaitForObjectDetach(__instance.handedness));
                 }
             }
+        }
 
-            [HarmonyPatch(typeof(Hand), "AttachObject", typeof(GameObject))]
-            private class HandGrabPatch
+        [HarmonyPatch(typeof(Hand), "AttachObject", typeof(GameObject))]
+        private class HandGrabPatch
+        {
+            public static void Postfix(Hand __instance, GameObject objectToAttach)
             {
-                public static void Postfix(Hand __instance, GameObject objectToAttach)
+                if (DiscordIntegration.hasLobby)
                 {
-                    if (DiscordIntegration.hasLobby)
+                    if (Utils.Utils.IsPlayerPart(objectToAttach))
                     {
-                        if (Utils.Utils.IsPlayerPart(objectToAttach))
+                        PlayerRepresentation playerRepresentation = Utils.Utils.GetRepresentation(objectToAttach);
+                        if (__instance.handedness == Handedness.RIGHT)
                         {
-                            PlayerRepresentation playerRepresentation = Utils.Utils.GetRepresentation(objectToAttach);
-                            if (__instance.handedness == Handedness.RIGHT)
+                            if (Utils.Utils.CanPickup(playerRepresentation))
                             {
-                                if (Utils.Utils.CanPickup(playerRepresentation))
-                                {
-                                    MelonLogger.Msg("Can pickup this player.");
-                                    playerRepresentation.GrabThisGuy(__instance.handedness, objectToAttach);
-                                }
-                                else
-                                {
-                                    if (HandVariables.rHandJoint != null)
-                                    {
-                                        GameObject.Destroy(HandVariables.rHandJoint);
-                                    }
-
-                                    HandVariables.rHandJoint = __instance.gameObject.AddComponent<FixedJoint>();
-                                    HandVariables.rHandJoint.connectedBody = objectToAttach.GetComponent<Rigidbody>();
-                                    HandVariables.rHandJoint.breakForce = Single.PositiveInfinity;
-                                    HandVariables.rHandJoint.breakTorque = Single.PositiveInfinity;
-                                }
+                                playerRepresentation.GrabThisGuy(__instance.handedness, objectToAttach);
                             }
-
-                            if (__instance.handedness == Handedness.LEFT)
+                            else
                             {
-                                if (Utils.Utils.CanPickup(playerRepresentation))
+                                if (HandVariables.rHandJoint != null)
                                 {
-                                    MelonLogger.Msg("Can pickup this player.");
-                                    playerRepresentation.GrabThisGuy(__instance.handedness, objectToAttach);
+                                    GameObject.Destroy(HandVariables.rHandJoint);
                                 }
-                                else
-                                {
-                                    if (HandVariables.lHandJoint != null)
-                                    {
-                                        GameObject.Destroy(HandVariables.lHandJoint);
-                                    }
 
-                                    HandVariables.lHandJoint = __instance.gameObject.AddComponent<FixedJoint>();
-                                    HandVariables.lHandJoint.connectedBody = objectToAttach.GetComponent<Rigidbody>();
-                                    HandVariables.lHandJoint.breakForce = Single.PositiveInfinity;
-                                    HandVariables.lHandJoint.breakTorque = Single.PositiveInfinity;
-                                }
+                                HandVariables.rHandJoint = __instance.gameObject.AddComponent<FixedJoint>();
+                                HandVariables.rHandJoint.connectedBody = objectToAttach.GetComponent<Rigidbody>();
+                                HandVariables.rHandJoint.breakForce = Single.PositiveInfinity;
+                                HandVariables.rHandJoint.breakTorque = Single.PositiveInfinity;
                             }
                         }
 
-                        DebugLogger.Msg("Grabbed: " + objectToAttach.name);
-                        MelonCoroutines.Start(PatchCoroutines.WaitForAttachSync(objectToAttach, __instance.handedness, true));
+                        if (__instance.handedness == Handedness.LEFT)
+                        {
+                            if (Utils.Utils.CanPickup(playerRepresentation))
+                            {
+                                playerRepresentation.GrabThisGuy(__instance.handedness, objectToAttach);
+                            }
+                            else
+                            {
+                                if (HandVariables.lHandJoint != null)
+                                {
+                                    GameObject.Destroy(HandVariables.lHandJoint);
+                                }
+
+                                HandVariables.lHandJoint = __instance.gameObject.AddComponent<FixedJoint>();
+                                HandVariables.lHandJoint.connectedBody = objectToAttach.GetComponent<Rigidbody>();
+                                HandVariables.lHandJoint.breakForce = Single.PositiveInfinity;
+                                HandVariables.lHandJoint.breakTorque = Single.PositiveInfinity;
+                            }
+                        }
                     }
+
+                    DebugLogger.Msg("Grabbed: " + objectToAttach.name);
+                    MelonCoroutines.Start(
+                        PatchCoroutines.WaitForAttachSync(objectToAttach, __instance.handedness, true));
                 }
             }
+        }
 
-            [HarmonyPatch(typeof(ForcePullGrip), "OnFarHandHoverUpdate")]
-            public class ForcePullPatch
+        [HarmonyPatch(typeof(ForcePullGrip), "OnFarHandHoverUpdate")]
+        public class ForcePullPatch
+        {
+            public static void Prefix(ForcePullGrip __instance, ref bool __state, Hand hand)
             {
-                public static void Prefix(ForcePullGrip __instance, ref bool __state, Hand hand)
-                {
-                    __state = __instance.pullCoroutine != null;
-                }
+                __state = __instance.pullCoroutine != null;
+            }
 
-                public static void Postfix(ForcePullGrip __instance, ref bool __state, Hand hand)
-                {
-                    if (!(__instance.pullCoroutine != null && !__state))
-                        return;
-                    MelonCoroutines.Start(PatchCoroutines.WaitForAttachSync(__instance.gameObject, hand.handedness, false));
-                }
+            public static void Postfix(ForcePullGrip __instance, ref bool __state, Hand hand)
+            {
+                if (!(__instance.pullCoroutine != null && !__state))
+                    return;
+                MelonCoroutines.Start(PatchCoroutines.WaitForAttachSync(__instance.gameObject, hand.handedness, false));
             }
         }
     }

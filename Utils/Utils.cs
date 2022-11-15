@@ -93,6 +93,11 @@ namespace BonelabMultiplayerMockup.Utils
             SyncedObject rSynced = Player.GetComponentInHand<SyncedObject>(Player.rightHand);
             SyncedObject lSynced = Player.GetComponentInHand<SyncedObject>(Player.rightHand);
 
+            if (!SyncedObject.relatedSyncedObjects.ContainsKey(syncedObject.groupId))
+            {
+                return false;
+            }
+
             foreach (var gropedSynced in SyncedObject.relatedSyncedObjects[syncedObject.groupId])
             {
                 if (rSynced)

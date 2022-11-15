@@ -18,6 +18,7 @@ namespace BonelabMultiplayerMockup.Packets.Object
             var initializeSyncData = (InitializeSyncData)messageData;
             var packetByteBuf = new PacketByteBuf();
             packetByteBuf.WriteByte(DiscordIntegration.GetByteId(initializeSyncData.userId));
+            packetByteBuf.WriteBool(initializeSyncData.checkInScene);
             packetByteBuf.WriteUShort(initializeSyncData.objectId);
             packetByteBuf.WriteUShort(initializeSyncData.finalId);
             packetByteBuf.WriteUShort(initializeSyncData.groupId);
@@ -30,6 +31,7 @@ namespace BonelabMultiplayerMockup.Packets.Object
         public override void ReadData(PacketByteBuf packetByteBuf, long sender)
         {
             var userId = DiscordIntegration.GetLongId(packetByteBuf.ReadByte());
+            var shouldCheckScene = packetByteBuf.ReadBoolean();
             var objectId = packetByteBuf.ReadUShort();
             var finalId = packetByteBuf.ReadUShort();
             var groupId = packetByteBuf.ReadUShort();
@@ -52,6 +54,12 @@ namespace BonelabMultiplayerMockup.Packets.Object
             if (!SyncedObject.syncedObjectIds.ContainsKey(objectId))
             {
                 var foundCopy = GameObject.Find(objectName);
+                
+                if (!shouldCheckScene)
+                {
+                    foundCopy = null;
+                }
+
                 if (!foundCopy)
                 {
                     DebugLogger.Error("Could not find object: " + objectName);
@@ -73,6 +81,7 @@ namespace BonelabMultiplayerMockup.Packets.Object
 
                     PoolManager.SpawnGameObject(barcode, new Vector3(0, 0, 0), Quaternion.identity, o =>
                     {
+                        SyncedObject.cachedSpawnedObjects.Add(groupId, o);
                         DebugLogger.Msg("Spawned object! "+" "+barcode);
                         DebugLogger.Msg("Started sync ID as: "+objectId);
                         SyncedObject.FutureSync(o, groupId, userId);
@@ -108,6 +117,7 @@ namespace BonelabMultiplayerMockup.Packets.Object
     public class InitializeSyncData : MessageData
     {
         public string barcode;
+        public bool checkInScene;
         public ushort groupId;
         public ushort objectId;
         public ushort finalId;

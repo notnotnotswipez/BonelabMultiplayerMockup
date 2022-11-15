@@ -5,6 +5,7 @@ using BonelabMultiplayerMockup.Packets.Gun;
 using BonelabMultiplayerMockup.Packets.Object;
 using BonelabMultiplayerMockup.Packets.Player;
 using BonelabMultiplayerMockup.Packets.Reset;
+using BonelabMultiplayerMockup.Packets.World;
 using MelonLoader;
 using SLZ.Marrow.SceneStreaming;
 using UnityEngine.SceneManagement;
@@ -45,52 +46,15 @@ namespace BonelabMultiplayerMockup.Packets
             MessageReaders.Add(NetworkMessageType.GrabStatePacket, new GrabStatePacket());
             MessageReaders.Add(NetworkMessageType.PlayerStartGrabPacket, new PlayerStartGrabPacket());
             MessageReaders.Add(NetworkMessageType.PlayerEndGrabPacket, new PlayerEndGrabPacket());
-        }
-
-        private static IEnumerator WaitForSceneLoadHandlePackets()
-        {
-            if (isQueueingPackets)
-            {
-                yield break;
-            }
-            
-            isQueueingPackets = true;
-            while (SceneStreamer.Session.Status == StreamStatus.LOADING)
-            {
-                yield return null;
-            }
-            // Make sure that when all these syncs are handled, they are done and made in order
-            SyncedObject.CleanData();
-
-            for (int i = 0; i <  _queuedPackets.Count; i++)
-            {
-                QueuedPacket queuedPacket = _queuedPackets[i];
-                ReadMessage(queuedPacket._type, queuedPacket.buf, queuedPacket.sender);
-            }
-            _queuedPackets.Clear();
-            isQueueingPackets = false;
+            MessageReaders.Add(NetworkMessageType.GameControlPacket, new GameControlPacket());
+            MessageReaders.Add(NetworkMessageType.SpawnRequestPacket, new SpawnRequestPacket());
         }
 
         public static void ReadMessage(NetworkMessageType messageType, PacketByteBuf packetByteBuf, long sender)
         {
+            // Dont read packets if we're in a loading screen. It causes a huge amount of lag and memory issues.
             if (SceneStreamer.Session.Status == StreamStatus.LOADING)
             {
-                // Only these are the important ones
-                if (messageType == NetworkMessageType.InitializeSyncPacket)
-                {
-                    QueuedPacket queuedPacket = new QueuedPacket()
-                    {
-                        _type = messageType,
-                        buf = packetByteBuf,
-                        sender = sender
-                    };
-                    _queuedPackets.Add(queuedPacket);
-                    
-                    if (!isQueueingPackets)
-                    {
-                        MelonCoroutines.Start(WaitForSceneLoadHandlePackets());
-                    }
-                }
                 return;
             }
 
