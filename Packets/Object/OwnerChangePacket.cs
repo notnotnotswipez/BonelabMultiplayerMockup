@@ -1,4 +1,5 @@
 using BonelabMultiplayerMockup.Object;
+using Steamworks;
 
 namespace BonelabMultiplayerMockup.Packets.Object
 {
@@ -9,7 +10,7 @@ namespace BonelabMultiplayerMockup.Packets.Object
             var ownerQueueChangeData = (OwnerChangeData)messageData;
 
             var packetByteBuf = new PacketByteBuf();
-            packetByteBuf.WriteByte(DiscordIntegration.GetByteId(ownerQueueChangeData.userId));
+            packetByteBuf.WriteByte(SteamIntegration.GetByteId(ownerQueueChangeData.userId));
             packetByteBuf.WriteUShort(ownerQueueChangeData.objectId);
             packetByteBuf.create();
 
@@ -18,7 +19,7 @@ namespace BonelabMultiplayerMockup.Packets.Object
 
         public override void ReadData(PacketByteBuf packetByteBuf, long sender)
         {
-            var userId = DiscordIntegration.GetLongId(packetByteBuf.ReadByte());
+            SteamId userId = SteamIntegration.GetLongId(packetByteBuf.ReadByte());
             var objectId = packetByteBuf.ReadUShort();
 
             var syncedObject = SyncedObject.GetSyncedObject(objectId);
@@ -35,6 +36,6 @@ namespace BonelabMultiplayerMockup.Packets.Object
     public class OwnerChangeData : MessageData
     {
         public ushort objectId;
-        public long userId;
+        public SteamId userId;
     }
 }

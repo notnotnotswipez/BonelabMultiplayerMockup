@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
-using AkilliMum.SRP.Mirror;
 using BonelabMultiplayerMockup.Extention;
 using BonelabMultiplayerMockup.NetworkData;
 using BonelabMultiplayerMockup.Nodes;
@@ -17,12 +17,19 @@ using BonelabMultiplayerMockup.Patches;
 using BonelabMultiplayerMockup.Representations;
 using BonelabMultiplayerMockup.Utils;
 using BoneLib;
+using BoneLib.BoneMenu;
+using BoneLib.BoneMenu.Elements;
+using BoneLib.RandomShit;
 using MelonLoader;
+using SLZ;
 using SLZ.Interaction;
 using SLZ.Marrow.SceneStreaming;
 using SLZ.Rig;
+using Steamworks;
+using Steamworks.Data;
 using UnityEngine;
 using Avatar = SLZ.VRMK.Avatar;
+using Color = UnityEngine.Color;
 
 namespace BonelabMultiplayerMockup
 {
@@ -31,7 +38,7 @@ namespace BonelabMultiplayerMockup
         public const string Name = "BonelabMultiplayerMockup"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "notnotnotswipez"; // Author of the Mod.  (Set as null if none)
         public const string Company = null; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "6.0.0"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "7.0.0"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = null; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -47,6 +54,9 @@ namespace BonelabMultiplayerMockup
         private static float currentStall = 1;
         public static string sceneName = "";
         public static bool waitingForSceneLoad = false;
+        public long lastMsUpdate = 0;
+
+        public static bool shouldModifyControllerPos = false;
 
         public static GameObject pelvis;
         public static byte pelvisId;
@@ -58,6 +68,15 @@ namespace BonelabMultiplayerMockup
         {
             BLMPCategory = MelonPreferences.CreateCategory("BLMP");
             playerMotionSmoothing = BLMPCategory.CreateEntry<bool>("playerMotionSmoothing", false);
+            CreateMenu();
+        }
+        
+        public void CreateMenu()
+        {
+            MenuCategory mainCategory = MenuManager.CreateCategory("MP Mockup", Color.yellow);
+            SubPanelElement serverManagement = mainCategory.CreateSubPanel("Server Management", Color.green);
+            serverManagement.CreateFunctionElement("Start Server", Color.green, () => StartServer());
+            serverManagement.CreateFunctionElement("Disconnect/Stop", Color.red, () => SteamIntegration.Disconnect(false));
         }
 
         public static void PopulateCurrentAvatarData()
@@ -65,7 +84,7 @@ namespace BonelabMultiplayerMockup
             boneDictionary.Clear();
             currentBoneId = 0;
             
-            PopulateBoneDictionary(Player.GetRigManager().GetComponentInChildren<RigManager>().avatar.gameObject.transform);
+            PopulateBoneDictionary(Player.rigManager.avatar.gameObject.transform);
             PopulateCurrentColliderData();
         }
 
@@ -163,11 +182,99 @@ namespace BonelabMultiplayerMockup
         public override void OnApplicationStart()
         {
             GameSDK.LoadGameSDK();
-            PacketHandler.RegisterPackets();
-            DiscordIntegration.Init();
-            Client.StartClient();
+            SteamIntegration.Init();
             DataDirectory.Initialize();
+            PacketHandler.RegisterPackets();
             
+            DiscordRichPresence.Init();
+
+            Thread thread = new Thread(ProcessPackets);
+            thread.Start();
+            
+        }
+
+        void ProcessPackets()
+        {
+            while (true)
+            {
+                Stopwatch stopwatch = Stopwatch.StartNew();
+                try
+                {
+                    while (SteamPacketNode.queuedBufs.Count > 0)
+                    {
+                        // Failsafe, if the game stalls, the accumulated packets goes to the thousands. This is wrong, the cache must be cleared.
+                        if (DateTime.Now.Millisecond - lastMsUpdate > 40)
+                        {
+                            SteamPacketNode.cachedUnreliable = new ConcurrentQueue<SteamPacketNode.QueuedReceived>();
+                            SteamPacketNode.queuedBufs = new ConcurrentQueue<SteamPacketNode.QueuedPacket>();
+                            break;
+                        }
+                        
+                        SteamPacketNode.QueuedPacket packets;
+                        while (!SteamPacketNode.queuedBufs.TryDequeue(out packets)) continue;
+
+                        P2PSend sendType = SteamIntegration.networkChannels[packets.channel];
+                        SteamNetworking.SendP2PPacket(packets._steamId, packets._packetByteBuf.getBytes(),
+                            packets._packetByteBuf.byteIndex, (byte)packets.channel, sendType);
+                    }
+                }
+                catch (Exception e)
+                {
+                    MelonLogger.Error(e.ToString());
+                }
+
+                stopwatch.Stop();
+                SteamPacketNode.flushMsTime = stopwatch.ElapsedMilliseconds;
+
+                foreach (NetworkChannel channel in SteamIntegration.reliableChannels.Keys)
+                {
+                    while (SteamNetworking.IsP2PPacketAvailable((int)channel))
+                    {
+                        P2Packet? packet = SteamNetworking.ReadP2PPacket((int)channel);
+                        if (packet.HasValue)
+                        {
+                            byte[] data = packet.Value.Data;
+                            if (data.Length <= 0) // Idk
+                                throw new Exception("Data was invalid!");
+                            byte messageType = data[0];
+                            byte[] realData = new byte[data.Length - sizeof(byte)];
+                            for (int b = sizeof(byte); b < data.Length; b++)
+                                realData[b - sizeof(byte)] = data[b];
+                            PacketByteBuf packetByteBuf = new PacketByteBuf(realData);
+                            NetworkMessageType networkMessageType = (NetworkMessageType)messageType;
+                            SteamPacketNode.QueuedReceived queuedReceived = new SteamPacketNode.QueuedReceived()
+                            {
+                                networkMessageType = networkMessageType,
+                                packetByteBuf = packetByteBuf
+                            };
+                            SteamPacketNode.receivedPackets.Enqueue(queuedReceived);
+                        }
+                    }
+                }
+
+                while (SteamNetworking.IsP2PPacketAvailable((int)NetworkChannel.Unreliable))
+                {
+                    P2Packet? packet = SteamNetworking.ReadP2PPacket((int)NetworkChannel.Unreliable);
+                    if (packet.HasValue)
+                    {
+                        byte[] data = packet.Value.Data;
+                        if (data.Length <= 0) // Idk
+                            throw new Exception("Data was invalid!");
+                        byte messageType = data[0];
+                        byte[] realData = new byte[data.Length - sizeof(byte)];
+                        for (int b = sizeof(byte); b < data.Length; b++)
+                            realData[b - sizeof(byte)] = data[b];
+                        PacketByteBuf packetByteBuf = new PacketByteBuf(realData);
+                        NetworkMessageType networkMessageType = (NetworkMessageType)messageType;
+                        SteamPacketNode.QueuedReceived queuedReceived = new SteamPacketNode.QueuedReceived()
+                        {
+                            networkMessageType = networkMessageType,
+                            packetByteBuf = packetByteBuf
+                        };
+                        SteamPacketNode.cachedUnreliable.Enqueue(queuedReceived);
+                    }
+                }
+            }
         }
 
         private IEnumerator WaitForSceneLoad()
@@ -183,15 +290,15 @@ namespace BonelabMultiplayerMockup
                 barcode = SceneStreamer.Session._level._barcode._id
             };
             var sceneBuff = PacketHandler.CompressMessage(NetworkMessageType.LevelResponsePacket, sceneChangePacket);
-            Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, sceneBuff.getBytes());
+            SteamPacketNode.BroadcastMessage(NetworkChannel.Reliable, sceneBuff.getBytes());
             waitingForSceneLoad = false;
         }
 
         public override void OnSceneWasLoaded(int buildIndex, string sceneName)
         {
-            if (DiscordIntegration.hasLobby)
+            if (SteamIntegration.hasLobby)
             {
-                if (DiscordIntegration.isHost)
+                if (SteamIntegration.isHost)
                 {
                     if (SceneStreamer.Session.Status == StreamStatus.LOADING)
                     {
@@ -202,10 +309,9 @@ namespace BonelabMultiplayerMockup
                     }
                 }
 
-                if (Player.GetRigManager() != null)
+                if (Player.rigManager != null)
                 {
-                    
-                    GameObject rigManager = Player.GetRigManager();
+                    GameObject rigManager = Player.rigManager.gameObject;
                     if (rigManager.scene.name != BonelabMultiplayerMockup.sceneName)
                     {
                         DebugLogger.Msg("Cleaned data");
@@ -217,39 +323,126 @@ namespace BonelabMultiplayerMockup
                 
                         // Send packet to the lobby owner saying we loaded into the scene
                         var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.LevelResponsePacket, new LoadedLevelResponseData());
-                        Node.activeNode.SendMessage(DiscordIntegration.lobby.OwnerId, (byte)NetworkChannel.Reliable, catchupBuff.getBytes());
+                        SteamPacketNode.SendMessage(SteamIntegration.Instance.currentLobby.Owner.Id, (byte)NetworkChannel.Reliable, catchupBuff.getBytes());
                     }
                 }
             }
         }
 
+        public async void StartServer()
+        {
+            await SteamIntegration.Instance.CreateLobby();
+        }
+
         public override void OnUpdate()
         {
-            if (Input.GetKey(KeyCode.S))
+            /*if (Input.GetKey(KeyCode.J))
             {
-                Server.StartServer();
+                foreach (var rig in Patches.Patches.rigManagerObject.GetComponentsInChildren<OpenController>())
+                {
+                    rig.handedness = Handedness.UNDEFINED;
+                }
             }
             
+            if (Input.GetKeyDown(KeyCode.K))
+            {
+                shouldModifyControllerPos = !shouldModifyControllerPos;
+                RigManager rigManager = Player.GetRigManager().GetComponentInChildren<RigManager>();
+                RigManager clonesRigManager = Patches.Patches.rigManagerObject.GetComponentInChildren<RigManager>();
+                string original = rigManager._avatarCrate._barcode._id;
+                AssetsManager.LoadAvatar(original, o =>
+                {
+                    GameObject spawned = GameObject.Instantiate(o);
+                    Avatar avatar = spawned.GetComponent<Avatar>();
+                    spawned.transform.parent = rigManager.gameObject.transform;
+                    clonesRigManager.SwitchAvatar(avatar);
+                });
+            }
+
+            if (shouldModifyControllerPos)
+            {
+                if (Player.GetRigManager() != null)
+                {
+                    if (Patches.Patches.rigManagerObject != null)
+                    {
+
+                        Vector3 desiredPelvisPos =
+                            Player.GetRigManager().transform.Find("[PhysicsRig]").Find("Pelvis").position +
+                            new Vector3(5, 0, 0);
+                        
+                        GameObject rigManagerPelvis = Patches.Patches.rigManagerObject.transform.Find("[PhysicsRig]").Find("Pelvis").gameObject;
+
+                        Patches.Patches.rigManagerObject.transform.Find("[OVERRIDE RIG]").transform.position = Patches
+                            .Patches.rigManagerObject.transform.Find("[OpenControllerRig]").transform.position;
+                        
+                        Patches.Patches.rigManagerObject.transform.Find("[OVERRIDE RIG]").Find("TrackingZone").transform.position = Patches
+                            .Patches.rigManagerObject.transform.Find("[OpenControllerRig]").Find("TrackingSpace").transform.position;
+
+                        rigManagerPelvis.GetComponent<Rigidbody>().velocity =
+                            (desiredPelvisPos - rigManagerPelvis.transform.position).normalized * 2;
+                        
+                        Patches.Patches.rigManagerObject.transform.Find("[PhysicsRig]").Find("Pelvis").transform
+                            .rotation = Player.GetRigManager().transform.Find("[PhysicsRig]").Find("Pelvis").rotation;
+                        
+                        Patches.Patches.headObject.transform.position = Player.GetPlayerHead().transform.position + new Vector3(5, 0, 0);
+
+                        Patches.Patches.rControllerObject.transform.position =
+                            Player.rightController.transform.position;
+                        Patches.Patches.lControllerObject.transform.position = 
+                            Player.leftController.transform.position;
+
+                        Patches.Patches.rControllerObject.transform.rotation = Player.rightController.transform.rotation;
+                        Patches.Patches.lControllerObject.transform.rotation = Player.leftController.transform.rotation;
+                        Patches.Patches.headObject.transform.rotation = Player.GetPlayerHead().transform.rotation;
+                    }
+                }
+            }*/
+            
+            DiscordRichPresence.Update();
+            lastMsUpdate = DateTime.Now.Millisecond;
+            SteamPacketNode.Callbacks();
+            if (SteamIntegration.Instance != null)
+            {
+                SteamIntegration.Instance.Update();
+            }
+
+            if (SceneStreamer._session.Status == StreamStatus.LOADING)
+            {
+                SteamPacketNode.queuedBufs = new ConcurrentQueue<SteamPacketNode.QueuedPacket>();
+                SteamPacketNode.cachedUnreliable = new ConcurrentQueue<SteamPacketNode.QueuedReceived>();
+                SteamPacketNode.receivedPackets = new ConcurrentQueue<SteamPacketNode.QueuedReceived>();
+            }
+
+            if (Input.GetKey(KeyCode.S))
+            {
+                StartServer();
+            }
+
+            if (Input.GetKey(KeyCode.D))
+            {
+                MelonLogger.Msg("----------- SWIPEZ's AWESOME DEBUGGER MESSAGE -----------");
+                MelonLogger.Msg("Packets to receive size: "+SteamPacketNode.receivedPackets.Count);
+                MelonLogger.Msg("Packets to packets to send size buffer: "+SteamPacketNode.queuedBufs.Count);
+                MelonLogger.Msg("Connected users size: "+SteamIntegration.connectedIds.Count);
+                MelonLogger.Msg("User ids size: "+SteamIntegration.connectedIds.Count);
+                MelonLogger.Msg("LAST PACKET SENDING TIME TOOK: "+SteamPacketNode.flushMsTime+"ms");
+                MelonLogger.Msg("LAST PACKET RECEIVING TIME TOOK: "+SteamPacketNode.callbackMsTime+"ms");
+                MelonLogger.Msg("----------------------------------------------------------");
+            }
+
             if (Input.GetKey(KeyCode.M))
             {
-                if (DiscordIntegration.hasLobby)
+                if (SteamIntegration.hasLobby)
                 {
-                    if (DiscordIntegration.isHost)
-                    {
-                        Server.instance.Shutdown();
-                    }
-                    else
-                    {
-                        Client.instance.Shutdown();
-                    }
+                    SteamIntegration.Disconnect(false);
                 }
             }
 
             if (Input.GetKey(KeyCode.O))
             {
-                if (DiscordIntegration.hasLobby)
+                if (SteamIntegration.hasLobby)
                 {
-                    if (DiscordIntegration.isHost)
+                    if (SteamIntegration.isHost)
                     {
                         var syncResetData = new SyncResetData()
                         {
@@ -257,7 +450,7 @@ namespace BonelabMultiplayerMockup
                         };
                         PacketByteBuf packetByteBuf =
                             PacketHandler.CompressMessage(NetworkMessageType.SyncResetPacket, syncResetData);
-                        Node.activeNode.BroadcastMessage((byte)NetworkChannel.Transaction ,packetByteBuf.getBytes());
+                        SteamPacketNode.BroadcastMessage(NetworkChannel.Transaction, packetByteBuf.getBytes());
                         
                         SyncedObject.CleanData(true);
                     }
@@ -271,7 +464,7 @@ namespace BonelabMultiplayerMockup
             updateCount++;
             if (updateCount >= desiredFrames)
             {
-                if (DiscordIntegration.hasLobby)
+                if (SteamIntegration.hasLobby)
                 {
                     SendBones();
                     SendColliders();
@@ -285,7 +478,7 @@ namespace BonelabMultiplayerMockup
         public override void OnFixedUpdate()
         {
             
-            if (DiscordIntegration.hasLobby)
+            if (SteamIntegration.hasLobby)
             {
                 if (SyncedObject.syncedObjectIds.Count > 0)
                 {
@@ -321,7 +514,7 @@ namespace BonelabMultiplayerMockup
                             };
 
                             PacketByteBuf message = PacketHandler.CompressMessage(NetworkMessageType.GroupDestroyPacket, groupDestroyData);
-                            Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, message.getBytes());
+                            SteamPacketNode.BroadcastMessage(NetworkChannel.Object, message.getBytes());
                         }
 
                         SyncedObject.queuedObjectsToDelete.Clear();
@@ -349,13 +542,13 @@ namespace BonelabMultiplayerMockup
 
                 PlayerBoneData playerBoneData = new PlayerBoneData()
                 {
-                    userId = DiscordIntegration.currentUser.Id,
+                    userId = SteamIntegration.currentId,
                     boneId = i,
                     transform = simplifiedTransform
                 };
 
                 PacketByteBuf message = PacketHandler.CompressMessage(NetworkMessageType.PlayerUpdatePacket, playerBoneData);
-                Node.activeNode.BroadcastMessage((byte)NetworkChannel.Unreliable, message.getBytes());
+                SteamPacketNode.BroadcastMessage(NetworkChannel.Unreliable, message.getBytes());
             }
         }
         
@@ -384,19 +577,14 @@ namespace BonelabMultiplayerMockup
 
                 PlayerColliderData playerColliderData = new PlayerColliderData()
                 {
-                    userId = DiscordIntegration.currentUser.Id,
+                    userId = SteamIntegration.currentId,
                     colliderIndex = i,
                     CompressedTransform = simplifiedTransform
                 };
 
                 PacketByteBuf message = PacketHandler.CompressMessage(NetworkMessageType.PlayerColliderPacket, playerColliderData);
-                Node.activeNode.BroadcastMessage((byte)NetworkChannel.Unreliable, message.getBytes());
+                SteamPacketNode.BroadcastMessage(NetworkChannel.Unreliable, message.getBytes());
             }
-        }
-
-        public override void OnLateUpdate()
-        {
-            DiscordIntegration.Tick();
         }
     }
 }

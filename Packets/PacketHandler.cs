@@ -48,6 +48,7 @@ namespace BonelabMultiplayerMockup.Packets
             MessageReaders.Add(NetworkMessageType.PlayerEndGrabPacket, new PlayerEndGrabPacket());
             MessageReaders.Add(NetworkMessageType.GameControlPacket, new GameControlPacket());
             MessageReaders.Add(NetworkMessageType.SpawnRequestPacket, new SpawnRequestPacket());
+            MessageReaders.Add(NetworkMessageType.PlayerGreetingPacket, new PlayerGreetingPacket());
         }
 
         public static void ReadMessage(NetworkMessageType messageType, PacketByteBuf packetByteBuf, long sender)

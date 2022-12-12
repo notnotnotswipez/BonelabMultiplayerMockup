@@ -136,6 +136,13 @@ namespace BonelabMultiplayerMockup.Packets
         {
             return Convert.ToBoolean(getBytes()[byteIndex++]);
         }
+        
+        public ulong ReadULong()
+        {
+            ulong longNum = BitConverter.ToUInt64(getBytes(), byteIndex);
+            byteIndex += sizeof(ulong);
+            return longNum;
+        }
 
         public ushort ReadUShort()
         {
@@ -184,7 +191,14 @@ namespace BonelabMultiplayerMockup.Packets
         {
             byteList.Add(b);
         }
-
+        
+        public void WriteULong(ulong shor)
+        {
+            foreach (byte b in BitConverter.GetBytes(shor)) {
+                byteList.Add(b);
+            }
+        }
+        
         public void WriteLong(long longNum)
         {
             foreach (var b in BitConverter.GetBytes(longNum)) byteList.Add(b);

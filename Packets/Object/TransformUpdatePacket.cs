@@ -1,5 +1,6 @@
 using BonelabMultiplayerMockup.NetworkData;
 using BonelabMultiplayerMockup.Object;
+using Steamworks;
 
 namespace BonelabMultiplayerMockup.Packets.Object
 {
@@ -10,7 +11,7 @@ namespace BonelabMultiplayerMockup.Packets.Object
             var transformUpdateData = (TransformUpdateData)messageData;
             var packetByteBuf = new PacketByteBuf();
             packetByteBuf.WriteUShort(transformUpdateData.objectId);
-            packetByteBuf.WriteByte(DiscordIntegration.GetByteId(transformUpdateData.userId));
+            packetByteBuf.WriteByte(SteamIntegration.GetByteId(transformUpdateData.userId));
             packetByteBuf.WriteCompressedTransform(transformUpdateData.compressedTransform);
             packetByteBuf.create();
 
@@ -23,7 +24,7 @@ namespace BonelabMultiplayerMockup.Packets.Object
             var syncedObject = SyncedObject.GetSyncedObject(objectId);
             if (syncedObject == null)  return;
 
-            var userId = DiscordIntegration.GetLongId(packetByteBuf.ReadByte());
+            var userId = SteamIntegration.GetLongId(packetByteBuf.ReadByte());
             var compressedTransform = packetByteBuf.ReadCompressedTransform();
 
             syncedObject.UpdateObject(compressedTransform);
@@ -34,6 +35,6 @@ namespace BonelabMultiplayerMockup.Packets.Object
     {
         public ushort objectId;
         public CompressedTransform compressedTransform;
-        public long userId;
+        public SteamId userId;
     }
 }

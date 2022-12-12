@@ -1,5 +1,6 @@
 using BonelabMultiplayerMockup.Representations;
 using SLZ;
+using Steamworks;
 
 namespace BonelabMultiplayerMockup.Packets.Player
 {
@@ -9,7 +10,7 @@ namespace BonelabMultiplayerMockup.Packets.Player
         {
             PlayerEndGrabData playerEndGrabData = (PlayerEndGrabData)messageData;
             PacketByteBuf packetByteBuf = new PacketByteBuf();
-            packetByteBuf.WriteByte(DiscordIntegration.GetByteId(playerEndGrabData.userIdGrabber));
+            packetByteBuf.WriteByte(SteamIntegration.GetByteId(playerEndGrabData.userIdGrabber));
             packetByteBuf.WriteByte(playerEndGrabData.hand);
             packetByteBuf.create();
 
@@ -18,7 +19,7 @@ namespace BonelabMultiplayerMockup.Packets.Player
 
         public override void ReadData(PacketByteBuf packetByteBuf, long sender)
         {
-            long userId = DiscordIntegration.GetLongId(packetByteBuf.ReadByte());
+            SteamId userId = SteamIntegration.GetLongId(packetByteBuf.ReadByte());
             byte hand = packetByteBuf.ReadByte();
 
             var handedness = hand == 1 ? Handedness.RIGHT : Handedness.LEFT;
@@ -32,7 +33,7 @@ namespace BonelabMultiplayerMockup.Packets.Player
 
     public class PlayerEndGrabData : MessageData
     {
-        public long userIdGrabber;
+        public SteamId userIdGrabber;
         public byte hand;
     }
 }

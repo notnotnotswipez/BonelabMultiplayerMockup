@@ -1,4 +1,5 @@
 using System;
+using BonelabMultiplayerMockup.Nodes;
 
 namespace BonelabMultiplayerMockup.Packets.Player
 {
@@ -8,7 +9,7 @@ namespace BonelabMultiplayerMockup.Packets.Player
         {
             var shortIdMessageData = (ShortIdData)messageData;
             var packetByteBuf = new PacketByteBuf();
-            packetByteBuf.WriteLong(shortIdMessageData.userId);
+            packetByteBuf.WriteULong(shortIdMessageData.userId);
             packetByteBuf.WriteByte(shortIdMessageData.byteId);
             packetByteBuf.create();
             return packetByteBuf;
@@ -19,21 +20,19 @@ namespace BonelabMultiplayerMockup.Packets.Player
             if (packetByteBuf.getBytes().Length <= 0)
                 throw new IndexOutOfRangeException();
 
-            var index = 0;
-            var userId = BitConverter.ToInt64(packetByteBuf.getBytes(), index);
-            index += sizeof(long);
+            ulong userId = packetByteBuf.ReadULong();
+            var byteId = packetByteBuf.ReadByte();
 
-            var byteId = packetByteBuf.getBytes()[index++];
-
-            if (userId == DiscordIntegration.currentUser.Id)
-                DiscordIntegration.localByteId = byteId;
-            DiscordIntegration.RegisterUser(userId, byteId);
+            if (userId == SteamIntegration.currentId)
+                SteamIntegration.localByteId = byteId;
+            PlayerBonePacket.hasAskedAlready = false;
+            SteamIntegration.RegisterUser(byteId, userId);
         }
     }
 
     public class ShortIdData : MessageData
     {
         public byte byteId;
-        public long userId;
+        public ulong userId;
     }
 }

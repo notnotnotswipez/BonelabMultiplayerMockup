@@ -1,6 +1,7 @@
 using BonelabMultiplayerMockup.NetworkData;
 using BonelabMultiplayerMockup.Object;
 using BonelabMultiplayerMockup.Utils;
+using SLZ.Props;
 using SLZ.Props.Weapons;
 
 namespace BonelabMultiplayerMockup.Packets.Gun

@@ -23,6 +23,7 @@ using SLZ.Interaction;
 using SLZ.Marrow.Data;
 using SLZ.Rig;
 using SLZ.SFX;
+using Steamworks;
 using UnhollowerBaseLib;
 using UnhollowerRuntimeLib;
 using Unity.Barracuda;
@@ -34,8 +35,8 @@ namespace BonelabMultiplayerMockup.Representations
 {
     public class PlayerRepresentation
     {
-        public static Dictionary<long, PlayerRepresentation> representations =
-            new Dictionary<long, PlayerRepresentation>();
+        public static Dictionary<SteamId, PlayerRepresentation> representations =
+            new Dictionary<SteamId, PlayerRepresentation>();
         
         public Dictionary<byte, InterpolatedObject> boneDictionary = new Dictionary<byte, InterpolatedObject>();
         public Dictionary<byte, InterpolatedObject> colliderDictionary = new Dictionary<byte, InterpolatedObject>();
@@ -49,7 +50,7 @@ namespace BonelabMultiplayerMockup.Representations
         public GameObject rHand;
         public byte pelvisIndex = 0;
         public bool simulated = false;
-        public User user;
+        public Friend user;
         public string username;
         public string currentBarcode = "";
 
@@ -62,20 +63,21 @@ namespace BonelabMultiplayerMockup.Representations
         private static List<AudioClip> sounds = new List<AudioClip>();
         private static ImpactProperties _impactProperties;
 
-        public PlayerRepresentation(User user)
+        public PlayerRepresentation(Friend user)
         {
             this.user = user;
-            username = user.Username;
+            username = user.Name;
             var avatarAskData = new AvatarQuestionData()
             {
                 // yep
             };
             var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.AvatarQuestionPacket, avatarAskData);
-            Node.activeNode.SendMessage(this.user.Id, (byte)NetworkChannel.Transaction, catchupBuff.getBytes());
+            SteamPacketNode.SendMessage(user.Id, NetworkChannel.Transaction, catchupBuff.getBytes());
         }
         
         public void SetAvatar(string barcode)
         {
+            MelonLogger.Msg("Setting avatar for: "+username+" to: "+barcode);
             if (currentBarcode == barcode)
             {
                 if (playerRep != null)
@@ -107,7 +109,7 @@ namespace BonelabMultiplayerMockup.Representations
 
         private IEnumerator FinalizeColliders(string originalBarcode)
         {
-            RigManager rigManager = Player.GetRigManager().GetComponent<RigManager>();
+            RigManager rigManager = Player.rigManager;
             PatchVariables.shouldIgnoreAvatarSwitch = true;
             rigManager.SwitchAvatar(GameObject.Instantiate(playerRep).GetComponent<Avatar>());
             yield return new WaitForSecondsRealtime(1f);
@@ -135,7 +137,7 @@ namespace BonelabMultiplayerMockup.Representations
 
         private void FinalizeAvatar(GameObject go)
         {
-            string original = Player.GetRigManager().GetComponentInChildren<RigManager>()._avatarCrate._barcode._id;
+            string original = Player.rigManager._avatarCrate._barcode._id;
             if (playerRep != null)
             {
                 GameObject.Destroy(colliders);
@@ -278,13 +280,13 @@ namespace BonelabMultiplayerMockup.Representations
             
             var playerGrabData = new PlayerStartGrabData()
             {
-                userIdGrabber = DiscordIntegration.currentUser.Id,
+                userIdGrabber = SteamIntegration.currentId,
                 hand = (byte)(handedness == Handedness.RIGHT ? 1 : 0),
                 pelvisAtGrabEvent = new CompressedTransform(pelvis.transform.position, pelvis.transform.rotation),
                 colliderIndex = colliderIndex
             };
             var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.PlayerStartGrabPacket, playerGrabData);
-            Node.activeNode.SendMessage(this.user.Id, (byte)NetworkChannel.Transaction, catchupBuff.getBytes());
+            SteamPacketNode.SendMessage(this.user.Id, NetworkChannel.Transaction, catchupBuff.getBytes());
         }
 
         public void LetGoOfThisGuy(Handedness handedness)
@@ -317,11 +319,11 @@ namespace BonelabMultiplayerMockup.Representations
             
             var playerEndGrabData = new PlayerEndGrabData()
             {
-                userIdGrabber = DiscordIntegration.currentUser.Id,
+                userIdGrabber = SteamIntegration.currentId,
                 hand = (byte)(handedness == Handedness.RIGHT ? 1 : 0),
             };
             var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.PlayerEndGrabPacket, playerEndGrabData);
-            Node.activeNode.SendMessage(this.user.Id, (byte)NetworkChannel.Transaction, catchupBuff.getBytes());
+            SteamPacketNode.SendMessage(this.user.Id, NetworkChannel.Transaction, catchupBuff.getBytes());
         }
 
         private void AddCorrectProperties(GameObject gameObject, Collider collider, GenericGrip genericGripOriginal)

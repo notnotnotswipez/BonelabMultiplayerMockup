@@ -2,6 +2,7 @@ using System.Linq;
 using BonelabMultiplayerMockup.NetworkData;
 using BonelabMultiplayerMockup.Representations;
 using SLZ;
+using Steamworks;
 
 namespace BonelabMultiplayerMockup.Packets.Player
 {
@@ -11,7 +12,7 @@ namespace BonelabMultiplayerMockup.Packets.Player
         {
             PlayerStartGrabData playerStartGrabData = (PlayerStartGrabData)messageData;
             PacketByteBuf packetByteBuf = new PacketByteBuf();
-            packetByteBuf.WriteByte(DiscordIntegration.GetByteId(playerStartGrabData.userIdGrabber));
+            packetByteBuf.WriteByte(SteamIntegration.GetByteId(playerStartGrabData.userIdGrabber));
             packetByteBuf.WriteByte(playerStartGrabData.hand);
             packetByteBuf.WriteByte(playerStartGrabData.colliderIndex);
             packetByteBuf.WriteCompressedTransform(playerStartGrabData.pelvisAtGrabEvent);
@@ -22,7 +23,7 @@ namespace BonelabMultiplayerMockup.Packets.Player
 
         public override void ReadData(PacketByteBuf packetByteBuf, long sender)
         {
-            long userId = DiscordIntegration.GetLongId(packetByteBuf.ReadByte());
+            SteamId userId = SteamIntegration.GetLongId(packetByteBuf.ReadByte());
             byte hand = packetByteBuf.ReadByte();
             byte colliderIndex = packetByteBuf.ReadByte();
             CompressedTransform compressedTransform = packetByteBuf.ReadCompressedTransform();
@@ -40,7 +41,7 @@ namespace BonelabMultiplayerMockup.Packets.Player
 
     public class PlayerStartGrabData : MessageData
     {
-        public long userIdGrabber;
+        public SteamId userIdGrabber;
         public byte hand;
         public byte colliderIndex;
         public CompressedTransform pelvisAtGrabEvent;

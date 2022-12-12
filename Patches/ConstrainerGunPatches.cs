@@ -5,6 +5,7 @@ using BonelabMultiplayerMockup.Packets;
 using BonelabMultiplayerMockup.Packets.Gun;
 using BonelabMultiplayerMockup.Utils;
 using HarmonyLib;
+using SLZ.Props;
 using SLZ.Props.Weapons;
 using UnityEngine;
 
@@ -17,7 +18,7 @@ namespace BonelabMultiplayerMockup.Patches
         {
             public static void Postfix(Constrainer __instance, Rigidbody main, Rigidbody cb, Vector3 anchor, Vector3 connectedA)
             {
-                if (DiscordIntegration.hasLobby)
+                if (SteamIntegration.hasLobby)
                 {
                     SyncedObject constrainerSynced = SyncedObject.GetSyncedComponent(__instance.gameObject);
 
@@ -42,7 +43,7 @@ namespace BonelabMultiplayerMockup.Patches
                                 };
                                 var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.ConstrainerJointPacket,
                                     constrainerGunJointData);
-                                Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, packetByteBuf.getBytes());
+                                SteamPacketNode.BroadcastMessage(NetworkChannel.Object, packetByteBuf.getBytes());
                             }
                         }
                     }
@@ -55,7 +56,7 @@ namespace BonelabMultiplayerMockup.Patches
         {
             public static void Postfix(Constrainer __instance, Rigidbody main, Rigidbody cb, Vector3 anchor, Vector3 connectedA)
             {
-                if (DiscordIntegration.hasLobby)
+                if (SteamIntegration.hasLobby)
                 {
                     SyncedObject constrainerSynced = SyncedObject.GetSyncedComponent(__instance.gameObject);
 
@@ -80,7 +81,7 @@ namespace BonelabMultiplayerMockup.Patches
                                 };
                                 var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.ConstrainerJointPacket,
                                     constrainerGunJointData);
-                                Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, packetByteBuf.getBytes());
+                                SteamPacketNode.BroadcastMessage(NetworkChannel.Object, packetByteBuf.getBytes());
                             }
                         }
                     }
@@ -93,7 +94,7 @@ namespace BonelabMultiplayerMockup.Patches
         {
             public static void Postfix(Constrainer __instance, Rigidbody main, Rigidbody cb, Vector3 anchor, Vector3 connectedA, bool swapped)
             {
-                if (DiscordIntegration.hasLobby)
+                if (SteamIntegration.hasLobby)
                 {
                     SyncedObject constrainerSynced = SyncedObject.GetSyncedComponent(__instance.gameObject);
 
@@ -118,7 +119,7 @@ namespace BonelabMultiplayerMockup.Patches
                                 };
                                 var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.ConstrainerJointPacket,
                                     constrainerGunJointData);
-                                Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, packetByteBuf.getBytes());
+                                SteamPacketNode.BroadcastMessage(NetworkChannel.Object, packetByteBuf.getBytes());
                             }
                         }
                     }
@@ -131,7 +132,7 @@ namespace BonelabMultiplayerMockup.Patches
         {
             public static void Postfix(Constrainer __instance, Rigidbody main, Rigidbody cb, Vector3 anchor, Vector3 connectedA)
             {
-                if (DiscordIntegration.hasLobby)
+                if (SteamIntegration.hasLobby)
                 {
                     SyncedObject constrainerSynced = SyncedObject.GetSyncedComponent(__instance.gameObject);
 
@@ -156,7 +157,7 @@ namespace BonelabMultiplayerMockup.Patches
                                 };
                                 var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.ConstrainerJointPacket,
                                     constrainerGunJointData);
-                                Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, packetByteBuf.getBytes());
+                                SteamPacketNode.BroadcastMessage(NetworkChannel.Object, packetByteBuf.getBytes());
                             }
                         }
                     }
@@ -169,7 +170,7 @@ namespace BonelabMultiplayerMockup.Patches
         {
             public static void Postfix(Constrainer __instance, Rigidbody main, Rigidbody cb, Vector3 anchor, Vector3 connectedA)
             {
-                if (DiscordIntegration.hasLobby)
+                if (SteamIntegration.hasLobby)
                 {
                     SyncedObject constrainerSynced = SyncedObject.GetSyncedComponent(__instance.gameObject);
 
@@ -194,7 +195,7 @@ namespace BonelabMultiplayerMockup.Patches
                                 };
                                 var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.ConstrainerJointPacket,
                                     constrainerGunJointData);
-                                Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, packetByteBuf.getBytes());
+                                SteamPacketNode.BroadcastMessage(NetworkChannel.Object, packetByteBuf.getBytes());
                             }
                         }
                     }
@@ -207,7 +208,7 @@ namespace BonelabMultiplayerMockup.Patches
         {
             public static void Postfix(Constrainer __instance, Rigidbody main, Rigidbody cb, Vector3 anchor, Vector3 connectedA)
             {
-                if (DiscordIntegration.hasLobby)
+                if (SteamIntegration.hasLobby)
                 {
                     SyncedObject constrainerSynced = SyncedObject.GetSyncedComponent(__instance.gameObject);
 
@@ -232,7 +233,7 @@ namespace BonelabMultiplayerMockup.Patches
                                 };
                                 var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.ConstrainerJointPacket,
                                     constrainerGunJointData);
-                                Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, packetByteBuf.getBytes());
+                                SteamPacketNode.BroadcastMessage(NetworkChannel.Object, packetByteBuf.getBytes());
                             }
                         }
                     }

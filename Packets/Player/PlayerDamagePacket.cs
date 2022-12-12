@@ -15,7 +15,7 @@ namespace BonelabMultiplayerMockup.Packets.Player
         public override void ReadData(PacketByteBuf packetByteBuf, long sender)
         {
             float damage = packetByteBuf.ReadFloat();
-            BoneLib.Player.GetRigManager().GetComponentInChildren<Player_Health>().TAKEDAMAGE(damage);
+            BoneLib.Player.rigManager.GetComponentInChildren<Player_Health>().TAKEDAMAGE(damage);
         }
     }
 

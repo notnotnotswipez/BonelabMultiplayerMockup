@@ -1,6 +1,7 @@
 using BonelabMultiplayerMockup.Representations;
 using BonelabMultiplayerMockup.Utils;
 using MelonLoader;
+using Steamworks;
 
 namespace BonelabMultiplayerMockup.Packets.Player
 {
@@ -10,7 +11,7 @@ namespace BonelabMultiplayerMockup.Packets.Player
         {
             AvatarChangeData avatarChangeData = (AvatarChangeData)messageData;
             PacketByteBuf packetByteBuf = new PacketByteBuf();
-            packetByteBuf.WriteByte(DiscordIntegration.GetByteId(avatarChangeData.userId));
+            packetByteBuf.WriteByte(SteamIntegration.GetByteId(avatarChangeData.userId));
             packetByteBuf.WriteString(avatarChangeData.barcode);
             packetByteBuf.create();
 
@@ -19,15 +20,20 @@ namespace BonelabMultiplayerMockup.Packets.Player
 
         public override void ReadData(PacketByteBuf packetByteBuf, long sender)
         {
-            long userId = DiscordIntegration.GetLongId(packetByteBuf.ReadByte());
+            var userId = SteamIntegration.GetLongId(packetByteBuf.ReadByte());
             string barcode = packetByteBuf.ReadString();
             
-            DebugLogger.Msg(userId+" sent a request to change their avatar to barcode: "+barcode);
+            MelonLogger.Msg(userId+" sent a request to change their avatar to barcode: "+barcode);
             
             if (PlayerRepresentation.representations.ContainsKey(userId))
             {
                 var playerRepresentation = PlayerRepresentation.representations[userId];
+                MelonLogger.Msg("Changing avatar on player rep");
                 playerRepresentation.SetAvatar(barcode);
+            }
+            else
+            {
+                MelonLogger.Error("Player who sent a avatar change request has NO player representation");
             }
         }
     }
@@ -35,6 +41,6 @@ namespace BonelabMultiplayerMockup.Packets.Player
     public class AvatarChangeData : MessageData
     {
         public string barcode;
-        public long userId;
+        public SteamId userId;
     }
 }

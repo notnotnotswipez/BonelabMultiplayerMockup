@@ -1,5 +1,6 @@
 using BonelabMultiplayerMockup.NetworkData;
 using BonelabMultiplayerMockup.Representations;
+using Steamworks;
 
 namespace BonelabMultiplayerMockup.Packets.Player
 {
@@ -9,7 +10,7 @@ namespace BonelabMultiplayerMockup.Packets.Player
         {
             PlayerColliderData data = (PlayerColliderData)messageData;
             PacketByteBuf packetByteBuf = new PacketByteBuf();
-            packetByteBuf.WriteByte(DiscordIntegration.GetByteId(data.userId));
+            packetByteBuf.WriteByte(SteamIntegration.GetByteId(data.userId));
             packetByteBuf.WriteByte(data.colliderIndex);
             packetByteBuf.WriteCompressedTransform(data.CompressedTransform);
             packetByteBuf.create();
@@ -19,7 +20,7 @@ namespace BonelabMultiplayerMockup.Packets.Player
 
         public override void ReadData(PacketByteBuf packetByteBuf, long sender)
         {
-            long userId = DiscordIntegration.GetLongId(packetByteBuf.ReadByte());
+            SteamId userId = SteamIntegration.GetLongId(packetByteBuf.ReadByte());
             byte colliderIndex = packetByteBuf.ReadByte();
             CompressedTransform compressedTransform = packetByteBuf.ReadCompressedTransform();
             
@@ -38,7 +39,7 @@ namespace BonelabMultiplayerMockup.Packets.Player
 
     public class PlayerColliderData : MessageData
     {
-        public long userId;
+        public SteamId userId;
         public byte colliderIndex;
         public CompressedTransform CompressedTransform;
     }

@@ -15,7 +15,7 @@ namespace BonelabMultiplayerMockup.Packets
 
             var secondBuf = new PacketByteBuf(realData);
 
-            PacketHandler.ReadMessage((NetworkMessageType)messageType, secondBuf, DiscordIntegration.currentUser.Id);
+            PacketHandler.ReadMessage((NetworkMessageType)messageType, secondBuf, 0);
         }
     }
 }

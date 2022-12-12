@@ -3,16 +3,20 @@ using BonelabMultiplayerMockup.NetworkData;
 using BonelabMultiplayerMockup.Nodes;
 using BonelabMultiplayerMockup.Representations;
 using MelonLoader;
+using Steamworks;
 
 namespace BonelabMultiplayerMockup.Packets.Player
 {
     public class PlayerBonePacket : NetworkPacket
     {
+
+        public static bool hasAskedAlready = false;
+
         public override PacketByteBuf CompressData(MessageData messageData)
         {
             var playerSyncMessageData = (PlayerBoneData)messageData;
             var packetByteBuf = new PacketByteBuf();
-            packetByteBuf.WriteByte(DiscordIntegration.GetByteId(playerSyncMessageData.userId));
+            packetByteBuf.WriteByte(SteamIntegration.GetByteId(playerSyncMessageData.userId));
             packetByteBuf.WriteByte(playerSyncMessageData.boneId);
             packetByteBuf.WriteCompressedTransform(playerSyncMessageData.transform);
             packetByteBuf.create();
@@ -25,7 +29,7 @@ namespace BonelabMultiplayerMockup.Packets.Player
             if (packetByteBuf.getBytes().Length <= 0)
                 throw new IndexOutOfRangeException();
 
-            var userId = DiscordIntegration.GetLongId(packetByteBuf.ReadByte());
+            var userId = SteamIntegration.GetLongId(packetByteBuf.ReadByte());
             var boneId = packetByteBuf.ReadByte();
             var simplifiedTransform = packetByteBuf.ReadCompressedTransform();
 
@@ -39,18 +43,6 @@ namespace BonelabMultiplayerMockup.Packets.Player
                 var playerRepresentation = PlayerRepresentation.representations[userId];
                 playerRepresentation.updateIkTransform(boneId, simplifiedTransform);
             }
-            else
-            {
-                MelonLogger.Error(
-                    "Something is wrong, player representation sent update but doesnt exist, requesting updates from host.");
-                var requestIdsMessageData = new RequestIdsData
-                {
-                    userId = DiscordIntegration.currentUser.Id
-                };
-                var shortBuf =
-                    PacketHandler.CompressMessage(NetworkMessageType.RequestIdsPacket, requestIdsMessageData);
-                Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, shortBuf.getBytes());
-            }
         }
     }
 
@@ -58,6 +50,6 @@ namespace BonelabMultiplayerMockup.Packets.Player
     {
         public byte boneId;
         public CompressedTransform transform;
-        public long userId;
+        public SteamId userId;
     }
 }

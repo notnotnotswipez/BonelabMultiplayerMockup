@@ -29,6 +29,7 @@ namespace BonelabMultiplayerMockup.Packets
         PlayerEndGrabPacket = 24,
         ConstrainerJointPacket = 25,
         GameControlPacket = 26,
-        SpawnRequestPacket = 27
+        SpawnRequestPacket = 27,
+        PlayerGreetingPacket = 28
     }
 }

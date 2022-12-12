@@ -13,6 +13,7 @@ using MelonLoader;
 using SLZ.AI;
 using SLZ.Marrow.Pool;
 using SLZ.Props.Weapons;
+using Steamworks;
 using UnityEngine;
 
 namespace BonelabMultiplayerMockup.Object
@@ -39,12 +40,12 @@ namespace BonelabMultiplayerMockup.Object
 
         public Vector3 lastPosition;
         public Quaternion lastRotation;
-        public long simulatorId;
+        public SteamId simulatorId;
         public bool isGrabbed = false;
         public ushort currentId;
         public ushort groupId;
         public ushort originalGroupId;
-        public long firstEverOwner = 0;
+        public SteamId firstEverOwner = 0;
         public SyncedObject storedMag;
 
         public bool isNpc = false;
@@ -100,13 +101,13 @@ namespace BonelabMultiplayerMockup.Object
                 var transformUpdateData = new TransformUpdateData
                 {
                     objectId = currentId,
-                    userId = DiscordIntegration.currentUser.Id,
+                    userId = SteamIntegration.currentId,
                     compressedTransform = compressedTransform
                 };
 
                 var packetByteBuf =
                     PacketHandler.CompressMessage(NetworkMessageType.TransformUpdatePacket, transformUpdateData);
-                Node.activeNode.BroadcastMessage((byte)NetworkChannel.Unreliable, packetByteBuf.getBytes());
+                SteamPacketNode.BroadcastMessage(NetworkChannel.Unreliable, packetByteBuf.getBytes());
             }
             
             PopulateGripEvents();
@@ -134,7 +135,7 @@ namespace BonelabMultiplayerMockup.Object
 
                     PacketByteBuf message =
                         PacketHandler.CompressMessage(NetworkMessageType.GroupDestroyPacket, groupDestroyData);
-                    Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, message.getBytes());
+                   SteamPacketNode.BroadcastMessage(NetworkChannel.Object, message.getBytes());
                 }
             }
             Destroy(this);
@@ -196,7 +197,7 @@ namespace BonelabMultiplayerMockup.Object
 
             var packetByteBuf =
                 PacketHandler.CompressMessage(NetworkMessageType.GrabStatePacket, grabStateData);
-            Node.activeNode.BroadcastMessage((byte)NetworkChannel.Transaction, packetByteBuf.getBytes());
+            SteamPacketNode.BroadcastMessage(NetworkChannel.Transaction, packetByteBuf.getBytes());
         }
 
         private void PopulateGripEvents()
@@ -213,7 +214,7 @@ namespace BonelabMultiplayerMockup.Object
                 
                 foreach (var totalGrip in highestGripEvent.GetComponentsInChildren<SimpleGripEvents>())
                 {
-                    MelonLogger.Msg("Indexed grip event at: "+index);
+                    DebugLogger.Msg("Indexed grip event at: "+index);
                     totalGrip.OnIndexDown.AddListener(new Action(() => OnIndexDown(totalGrip)));
                     totalGrip.OnMenuTapDown.AddListener(new Action(() => OnMenuTapDown(totalGrip)));
                     gripEvents.Add(totalGrip, index);
@@ -238,11 +239,11 @@ namespace BonelabMultiplayerMockup.Object
                 eventIndex = 1
             };
             
-            MelonLogger.Msg("Sent grip index: "+1+" for: "+gripIndex);
+            DebugLogger.Msg("Sent grip index: "+1+" for: "+gripIndex);
 
             var packetByteBuf =
                 PacketHandler.CompressMessage(NetworkMessageType.SimpleGripEventPacket, gripEventData);
-            Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, packetByteBuf.getBytes());
+            SteamPacketNode.BroadcastMessage(NetworkChannel.Reliable, packetByteBuf.getBytes());
         }
         
         private void OnMenuTapDown(SimpleGripEvents gripEvent)
@@ -263,7 +264,7 @@ namespace BonelabMultiplayerMockup.Object
 
             var packetByteBuf =
                 PacketHandler.CompressMessage(NetworkMessageType.SimpleGripEventPacket, gripEventData);
-            Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, packetByteBuf.getBytes());
+            SteamPacketNode.BroadcastMessage(NetworkChannel.Reliable, packetByteBuf.getBytes());
         }
 
         public static void UpdateSyncedNPCs()
@@ -294,7 +295,7 @@ namespace BonelabMultiplayerMockup.Object
             }
 
             List<ushort> finalGroupIds = new List<ushort>();
-            Vector3 playerHead = Player.GetPlayerHead().transform.position;
+            Vector3 playerHead = Player.playerHead.transform.position;
             List<Vector3> vectorsToCheck = groupIdsFlipped.Keys.ToList();
             for (int i = 0; i < maxNpcsToSync; i++)
             {
@@ -344,7 +345,7 @@ namespace BonelabMultiplayerMockup.Object
 
                 PacketByteBuf message =
                     PacketHandler.CompressMessage(NetworkMessageType.GroupDestroyPacket, groupDestroyData);
-                Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, message.getBytes());
+                SteamPacketNode.BroadcastMessage(NetworkChannel.Object, message.getBytes());
             }
 
             if (fullyRemoveList)
@@ -385,7 +386,7 @@ namespace BonelabMultiplayerMockup.Object
 
         public void UpdatePos()
         {
-            if (!DiscordIntegration.hasLobby) return;
+            if (!SteamIntegration.hasLobby) return;
 
             if (_rigidbody)
             {
@@ -400,7 +401,7 @@ namespace BonelabMultiplayerMockup.Object
                 return;
             }
 
-            if (DiscordIntegration.currentUser.Id == firstEverOwner)
+            if (SteamIntegration.currentId == firstEverOwner)
             {
                 if (!gameObject.activeInHierarchy)
                 {
@@ -443,13 +444,13 @@ namespace BonelabMultiplayerMockup.Object
                     var transformUpdateData = new TransformUpdateData
                     {
                         objectId = currentId,
-                        userId = DiscordIntegration.currentUser.Id,
+                        userId = SteamIntegration.currentId,
                         compressedTransform = compressedTransform
                     };
 
                     var packetByteBuf =
                         PacketHandler.CompressMessage(NetworkMessageType.TransformUpdatePacket, transformUpdateData);
-                    Node.activeNode.BroadcastMessage((byte)NetworkChannel.Unreliable, packetByteBuf.getBytes()); 
+                    SteamPacketNode.BroadcastMessage(NetworkChannel.Unreliable, packetByteBuf.getBytes()); 
                 }
             }
             UpdateStoredPositions();
@@ -461,7 +462,7 @@ namespace BonelabMultiplayerMockup.Object
             {
                 DebugLogger.Msg("Transferred ownership of sync Id: " + currentId);
 
-                var currentUserId = DiscordIntegration.currentUser.Id;
+                var currentUserId = SteamIntegration.currentId;
 
                 SetOwner(currentUserId);
                 var ownerQueueChangeData = new OwnerChangeData
@@ -471,7 +472,7 @@ namespace BonelabMultiplayerMockup.Object
                 };
                 var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.OwnerChangePacket,
                     ownerQueueChangeData);
-                Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, packetByteBuf.getBytes());
+                SteamPacketNode.BroadcastMessage(NetworkChannel.Reliable, packetByteBuf.getBytes());
                 DebugLogger.Msg("Transferring ownership of whole group ID: " + groupId);
 
                 List<SyncedObject> relatedSynced = relatedSyncedObjects[groupId];
@@ -485,7 +486,7 @@ namespace BonelabMultiplayerMockup.Object
             }
         }
 
-        public static void FutureSync(GameObject gameObject, ushort groupId, long userId)
+        public static void FutureSync(GameObject gameObject, ushort groupId, SteamId userId)
         {
             foreach (Rigidbody rigidbody in GetProperRigidBodies(gameObject.transform))
             {
@@ -494,7 +495,7 @@ namespace BonelabMultiplayerMockup.Object
             }
         }
 
-        public void ManualSetOwner(long userId, bool checkForSelfOwner)
+        public void ManualSetOwner(SteamId userId, bool checkForSelfOwner)
         {
             if (checkForSelfOwner)
                 if (!IsClientSimulated())
@@ -512,7 +513,7 @@ namespace BonelabMultiplayerMockup.Object
             
             var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.OwnerChangePacket,
                 ownerQueueChangeData);
-            Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, packetByteBuf.getBytes());
+            SteamPacketNode.BroadcastMessage(NetworkChannel.Reliable, packetByteBuf.getBytes());
 
             DebugLogger.Msg("Transferring ownership of whole group ID: " + groupId);
 
@@ -594,9 +595,9 @@ namespace BonelabMultiplayerMockup.Object
             return false;
         }
 
-        public static SyncedObject Sync(GameObject desiredSync, bool shouldCheckScene = true, string manualBarcode = "", long userId = 0)
+        public static SyncedObject Sync(GameObject desiredSync, bool shouldCheckScene = true, string manualBarcode = "", SteamId userId = new SteamId())
         {
-            if (!DiscordIntegration.hasLobby) return null;
+            if (!SteamIntegration.hasLobby) return null;
 
             if (isSyncedObject(desiredSync) || syncedObjects.Contains(desiredSync))
             {
@@ -605,7 +606,7 @@ namespace BonelabMultiplayerMockup.Object
 
             if (Blacklist.isBlacklisted(GetGameObjectPath(desiredSync.gameObject))) return null;
 
-            long desiredId = DiscordIntegration.currentUser.Id;
+            SteamId desiredId = SteamIntegration.currentId;
 
             if (userId != 0)
             {
@@ -651,7 +652,7 @@ namespace BonelabMultiplayerMockup.Object
                 var packetByteBuf =
                     PacketHandler.CompressMessage(NetworkMessageType.InitializeSyncPacket, initializeSyncData);
 
-                Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, packetByteBuf.getBytes());
+                SteamPacketNode.BroadcastMessage(NetworkChannel.Object, packetByteBuf.getBytes());
                 DebugLogger.Msg("Starting Id: " + startingId);
                 DebugLogger.Msg("Final Id:" + finalId);
                 DebugLogger.Msg("THIS SHOULD BE REFLECTED ON ALL OTHER CLIENTS.");
@@ -738,7 +739,7 @@ namespace BonelabMultiplayerMockup.Object
             }
         }
 
-        private static void FutureProofSync(GameObject gameObject, ushort groupId, long ownerId)
+        private static void FutureProofSync(GameObject gameObject, ushort groupId, SteamId ownerId)
         {
             if (gameObject.GetComponent<SyncedObject>())
             {
@@ -787,7 +788,7 @@ namespace BonelabMultiplayerMockup.Object
             else
             {
                 shouldTeleport = true;
-                if (!Node.activeNode.connectedUsers.Contains(simulatorId)) SetOwner(DiscordIntegration.lobby.OwnerId);
+                if (!SteamIntegration.connectedIds.Contains(simulatorId)) SetOwner(SteamIntegration.Instance.currentLobby.Owner.Id);
             }
         }
 
@@ -914,7 +915,7 @@ namespace BonelabMultiplayerMockup.Object
             return path;
         }
 
-        public void SetOwner(long userId)
+        public void SetOwner(SteamId userId)
         {
             if (simulatorId == userId)
             {
@@ -939,7 +940,7 @@ namespace BonelabMultiplayerMockup.Object
 
         public bool IsClientSimulated()
         {
-            return simulatorId == DiscordIntegration.currentUser.Id;
+            return simulatorId == SteamIntegration.currentId;
         }
 
         public static SyncedObject GetSyncedObject(ushort objectId)
@@ -953,25 +954,29 @@ namespace BonelabMultiplayerMockup.Object
         {
             if (!IsClientSimulated())
             {
-                if (!gameObject.activeInHierarchy)
+                if (gameObject)
                 {
-                    Transform parent = gameObject.transform;
-                    while (parent.gameObject.activeSelf)
+                    if (!gameObject.activeInHierarchy)
                     {
-                        parent = parent.parent;
+                        Transform parent = gameObject.transform;
+                        while (parent.gameObject.activeSelf)
+                        {
+                            parent = parent.parent;
+                        }
+
+                        parent.gameObject.SetActive(true);
                     }
 
-                    parent.gameObject.SetActive(true);
-                }
+                    if (_rigidbody)
+                    {
+                        _rigidbody.velocity = Vector3.zero;
+                        _rigidbody.isKinematic = true;
+                    }
 
-                if (_rigidbody)
-                {
-                    _rigidbody.velocity = Vector3.zero;
-                    _rigidbody.isKinematic = true;
+                    InterpolatedObject?.UpdateTarget(compressedTransform.position, compressedTransform.rotation, shouldTeleport);
+
+                    shouldTeleport = false;
                 }
-                
-                InterpolatedObject.UpdateTarget(compressedTransform.position, compressedTransform.rotation, shouldTeleport);
-                shouldTeleport = false;
             }
         }
 

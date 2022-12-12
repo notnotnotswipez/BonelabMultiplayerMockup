@@ -8,7 +8,7 @@
         <OutputType>Library</OutputType>
         <AppDesignerFolder>Properties</AppDesignerFolder>
         <RootNamespace>BonelabMultiplayerMockup</RootNamespace>
-        <AssemblyName>BonelabMultiplayerMockup</AssemblyName>
+        <AssemblyName>BonelabMultiplayerMockupSteamNetwork</AssemblyName>
         <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
         <FileAlignment>512</FileAlignment>
         <Deterministic>true</Deterministic>
@@ -44,7 +44,10 @@
             <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\MelonLoader\Managed\Assembly-CSharp-firstpass.dll</HintPath>
         </Reference>
         <Reference Include="BoneLib">
-            <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\Mods\BoneLib.dll</HintPath>
+          <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\Mods\BoneLib.dll</HintPath>
+        </Reference>
+        <Reference Include="Facepunch.Steamworks.Win64">
+          <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\Plugins\Facepunch.Steamworks.Win64.dll</HintPath>
         </Reference>
         <Reference Include="Il2Cppmscorlib">
             <HintPath>C:\Program Files (x86)\Steam\steamapps\common\BONELAB\MelonLoader\Managed\Il2Cppmscorlib.dll</HintPath>
@@ -388,7 +391,7 @@
         </Reference>
     </ItemGroup>
     <ItemGroup>
-        <Compile Include="DiscordIntegration.cs" />
+        <Compile Include="DiscordRichPresence.cs" />
         <Compile Include="Discord\ActivityManager.cs" />
         <Compile Include="Discord\Constants.cs" />
         <Compile Include="Discord\Core.cs" />
@@ -400,9 +403,7 @@
         <Compile Include="MelonLoaderMod.cs" />
         <Compile Include="NetworkData\CompressedTransform.cs" />
         <Compile Include="NetworkData\BytePosition.cs" />
-        <Compile Include="Nodes\Client.cs" />
-        <Compile Include="Nodes\Node.cs" />
-        <Compile Include="Nodes\Server.cs" />
+        <Compile Include="Nodes\SteamPacketNode.cs" />
         <Compile Include="Object\InterpolatedObject.cs" />
         <Compile Include="Object\SyncedObject.cs" />
         <Compile Include="Packets\DebugAssistance.cs" />
@@ -431,6 +432,7 @@
         <Compile Include="Packets\Player\PlayerColliderPacket.cs" />
         <Compile Include="Packets\Player\PlayerDamagePacket.cs" />
         <Compile Include="Packets\Player\PlayerEndGrabPacket.cs" />
+        <Compile Include="Packets\Player\PlayerGreetingPacket.cs" />
         <Compile Include="Packets\Player\PlayerStartGrabPacket.cs" />
         <Compile Include="Packets\Player\RequestIdsPacket.cs" />
         <Compile Include="Packets\Player\SceneChangePacket.cs" />
@@ -443,6 +445,7 @@
         <Compile Include="Patches\Patches.cs" />
         <Compile Include="Properties\AssemblyInfo.cs" />
         <Compile Include="Representations\PlayerRepresentation.cs" />
+        <Compile Include="SteamIntegration.cs" />
         <Compile Include="Utils\AssetsManager.cs" />
         <Compile Include="Utils\Blacklist.cs" />
         <Compile Include="Utils\Utils.cs" />

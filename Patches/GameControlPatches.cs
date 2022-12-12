@@ -19,7 +19,7 @@ namespace BonelabMultiplayerMockup.Patches
         {
             public static void Prefix(GameControl_Descent __instance, int gate_index)
             {
-                if (DiscordIntegration.hasLobby && !GameControlVariables.shouldIgnoreGameEvents)
+                if (SteamIntegration.hasLobby && !GameControlVariables.shouldIgnoreGameEvents)
                 {
                     MelonLogger.Msg("Descent sequence triggered: "+gate_index);
                     var gameControl = new GameControlData()
@@ -29,7 +29,7 @@ namespace BonelabMultiplayerMockup.Patches
                     };
                     var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.GameControlPacket,
                         gameControl);
-                    Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, packetByteBuf.getBytes());
+                    SteamPacketNode.BroadcastMessage(NetworkChannel.Object, packetByteBuf.getBytes());
                 }
             }
         }

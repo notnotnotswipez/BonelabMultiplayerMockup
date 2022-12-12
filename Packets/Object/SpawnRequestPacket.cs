@@ -3,6 +3,7 @@ using BonelabMultiplayerMockup.NetworkData;
 using BonelabMultiplayerMockup.Object;
 using BonelabMultiplayerMockup.Utils;
 using MelonLoader;
+using Steamworks;
 using UnityEngine;
 
 namespace BonelabMultiplayerMockup.Packets.Object
@@ -10,7 +11,7 @@ namespace BonelabMultiplayerMockup.Packets.Object
     public class SpawnRequestPacket : NetworkPacket
     {
 
-        public IEnumerator WaitForSpawn(GameObject gameObject, string barcode, long userId)
+        public IEnumerator WaitForSpawn(GameObject gameObject, string barcode, SteamId userId)
         {
             yield return new WaitForSecondsRealtime(2);
             SyncedObject synced = SyncedObject.Sync(gameObject, false, barcode);
@@ -20,7 +21,7 @@ namespace BonelabMultiplayerMockup.Packets.Object
         {
             SpawnRequestData spawnRequestData = (SpawnRequestData)messageData;
             PacketByteBuf packetByteBuf = new PacketByteBuf();
-            packetByteBuf.WriteByte(DiscordIntegration.GetByteId(spawnRequestData.userId));
+            packetByteBuf.WriteByte(SteamIntegration.GetByteId(spawnRequestData.userId));
             packetByteBuf.WriteBytePosition(spawnRequestData.position);
             packetByteBuf.WriteString(spawnRequestData.barcode);
             packetByteBuf.create();
@@ -30,9 +31,9 @@ namespace BonelabMultiplayerMockup.Packets.Object
 
         public override void ReadData(PacketByteBuf packetByteBuf, long sender)
         {
-            if (DiscordIntegration.isHost)
+            if (SteamIntegration.isHost)
             {
-                long userId = DiscordIntegration.GetLongId(packetByteBuf.ReadByte());
+                SteamId userId = SteamIntegration.GetLongId(packetByteBuf.ReadByte());
                 BytePosition bytePosition = packetByteBuf.ReadBytePosition();
                 string barcode = packetByteBuf.ReadString();
                 
@@ -48,7 +49,7 @@ namespace BonelabMultiplayerMockup.Packets.Object
 
     public class SpawnRequestData : MessageData
     {
-        public long userId;
+        public SteamId userId;
         public BytePosition position;
         public string barcode;
     }

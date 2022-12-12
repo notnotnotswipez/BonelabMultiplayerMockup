@@ -1,4 +1,3 @@
-using System;
 using System.Collections;
 using System.Collections.Generic;
 using BonelabMultiplayerMockup.NetworkData;
@@ -12,6 +11,7 @@ using BonelabMultiplayerMockup.Representations;
 using BonelabMultiplayerMockup.Utils;
 using BoneLib;
 using HarmonyLib;
+using Il2CppSystem;
 using MelonLoader;
 using SLZ;
 using SLZ.AI;
@@ -21,13 +21,17 @@ using SLZ.Interaction;
 using SLZ.Marrow.Data;
 using SLZ.Marrow.Pool;
 using SLZ.Marrow.Warehouse;
+using SLZ.Props;
 using SLZ.Props.Weapons;
 using SLZ.Rig;
 using SLZ.SFX;
+using SLZ.UI;
 using SLZ.Zones;
 using UnityEngine;
 using UnityEngine.Events;
 using Avatar = SLZ.VRMK.Avatar;
+using Exception = System.Exception;
+using Single = System.Single;
 
 namespace BonelabMultiplayerMockup.Patches
 {
@@ -45,26 +49,28 @@ namespace BonelabMultiplayerMockup.Patches
         {
             yield return new WaitForSecondsRealtime(1f);
 
+            MelonLogger.Msg("Swapped avatar and sending to everyone.");
             try
             {
                 var swapAvatarMessageData = new AvatarChangeData()
                 {
-                    userId = DiscordIntegration.currentUser.Id,
-                    barcode = Player.GetRigManager().GetComponentInChildren<RigManager>()._avatarCrate._barcode._id
+                    userId = SteamIntegration.currentId,
+                    barcode = Player.rigManager._avatarCrate._barcode._id
                 };
+                MelonLogger.Msg("Created ");
                 var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.AvatarChangePacket,
                     swapAvatarMessageData);
-                Node.activeNode.BroadcastMessage((byte)NetworkChannel.Reliable, packetByteBuf.getBytes());
+                SteamPacketNode.BroadcastMessage(NetworkChannel.Transaction, packetByteBuf.getBytes());
                 BonelabMultiplayerMockup.PopulateCurrentAvatarData();
                 if (BonelabMultiplayerMockup.debugRep != null)
                 {
-                    BonelabMultiplayerMockup.debugRep.SetAvatar(Player.GetRigManager().GetComponentInChildren<RigManager>()
+                    BonelabMultiplayerMockup.debugRep.SetAvatar(Player.rigManager
                         ._avatarCrate._barcode._id);
                 }
             }
             catch (Exception e)
             {
-                // Ignore.
+                MelonLogger.Msg(e.Message);
             }
         }
 
@@ -78,7 +84,7 @@ namespace BonelabMultiplayerMockup.Patches
             }
             else
             {
-                syncedObject.ManualSetOwner(DiscordIntegration.currentUser.Id, false);
+                syncedObject.ManualSetOwner(SteamIntegration.currentId, false);
             }
         }
 
@@ -86,7 +92,7 @@ namespace BonelabMultiplayerMockup.Patches
         {
             var spawnRequestData = new SpawnRequestData()
             {
-                userId = DiscordIntegration.currentUser.Id,
+                userId = SteamIntegration.currentId,
                 position = new BytePosition(poolee.gameObject.transform.position),
                 barcode = poolee.spawnableCrate._barcode
             };
@@ -94,7 +100,7 @@ namespace BonelabMultiplayerMockup.Patches
             PacketByteBuf packetByteBuf =
                 PacketHandler.CompressMessage(NetworkMessageType.SpawnRequestPacket, spawnRequestData);
             
-            Node.activeNode.SendMessage(DiscordIntegration.lobby.OwnerId, (byte)NetworkChannel.Transaction, packetByteBuf.getBytes());
+            SteamPacketNode.SendMessage(SteamIntegration.Instance.currentLobby.Owner.Id, NetworkChannel.Transaction, packetByteBuf.getBytes());
             poolee.Despawn();
             yield break;
         }
@@ -244,12 +250,119 @@ namespace BonelabMultiplayerMockup.Patches
     public class Patches
     {
 
+        public static GameObject rigManagerObject;
+        public static GameObject lControllerObject;
+        public static GameObject rControllerObject;
+        public static GameObject headObject;
+        
+        [HarmonyPatch(typeof(RigManager), "Awake")]
+        private class RigmanagerCachePatch
+        {
+            public static void Prefix(RigManager __instance)
+            {
+                /*if (!__instance.gameObject.name.ToLower().Contains("clone"))
+                {
+                    rigManagerObject = GameObject.Instantiate(__instance.gameObject);
+                    foreach (var cam in rigManagerObject.GetComponentsInChildren<Camera>())
+                    {
+                        cam.enabled = false;
+                    }
+                    foreach (var controller in rigManagerObject.GetComponentsInChildren<OpenController>())
+                    {
+                        controller.handedness = Handedness.UNDEFINED;
+                    }
+                    FixRigManager(rigManagerObject.GetComponent<RigManager>());
+                }*/
+            }
+        }
+
+        private static void FixRigManager(RigManager rigManager)
+        {
+            rigManager.gameObject.transform.rotation = Quaternion.identity;
+            HeadSFX headSfx = rigManager.GetComponentInChildren<HeadSFX>();
+            GameObject.Destroy(rigManager.GetComponentInChildren<PageView>().gameObject);
+
+            GameObject originalCamera = rigManager.gameObject.transform.Find("[OpenControllerRig]")
+                .Find("TrackingSpace").Find("Head").gameObject;
+
+            GameObject copiedHead = GameObject.Instantiate(originalCamera);
+            
+            GameObject overrideRig = new GameObject("[OVERRIDE RIG]");
+
+            overrideRig.transform.parent = rigManager.gameObject.transform;
+            
+            overrideRig.transform.localPosition = Vector3.zero;
+            
+            GameObject fakeTrackingZone = new GameObject("TrackingSpace");
+            fakeTrackingZone.transform.parent = overrideRig.transform;
+            
+            fakeTrackingZone.transform.localPosition = Vector3.zero;
+            fakeTrackingZone.transform.rotation = Quaternion.identity;
+            
+            GameObject lController = new GameObject("LController");
+            GameObject rController = new GameObject("RController");
+            GameObject lFilter = new GameObject("LFilter");
+            GameObject rFilter = new GameObject("RFilter");
+            GameObject head = copiedHead;
+            
+            lController.transform.parent = fakeTrackingZone.transform;
+            rController.transform.parent = fakeTrackingZone.transform;
+            lFilter.transform.parent = fakeTrackingZone.transform;
+            rFilter.transform.parent = fakeTrackingZone.transform;
+            head.transform.parent = fakeTrackingZone.transform;
+            
+            lFilter.transform.localPosition = Vector3.zero;
+            rFilter.transform.localPosition = Vector3.zero;
+            rController.transform.localPosition = Vector3.zero;
+            lController.transform.localPosition = Vector3.zero;
+            head.transform.localPosition = Vector3.zero;
+            
+            lFilter.transform.rotation = Quaternion.identity;
+            rFilter.transform.rotation = Quaternion.identity;
+            rController.transform.rotation = Quaternion.identity;
+            lController.transform.rotation = Quaternion.identity;
+            head.transform.rotation = Quaternion.identity;
+            
+            BaseController lBaseController = lController.AddComponent<BaseController>();
+            BaseController rBaseController = rController.AddComponent<BaseController>();
+            ControllerRig controllerRig = overrideRig.AddComponent<ControllerRig>();
+            
+            rigManager.rigs.AddItem(controllerRig);
+
+            controllerRig.hmdTransform = head.transform;
+            controllerRig.directionMasterTransform = head.transform;
+            
+            controllerRig.vrRoot = fakeTrackingZone.transform;
+
+            controllerRig.leftController = lBaseController;
+            controllerRig.leftFilter = lFilter.transform;
+            
+            controllerRig.rightController = rBaseController;
+            controllerRig.rightFilter = rFilter.transform;
+
+            controllerRig._headSfx = headSfx;
+
+            rBaseController.manager = controllerRig;
+            lBaseController.manager = controllerRig;
+
+            controllerRig.m_head = head.transform;
+            controllerRig.m_handLf = lController.transform;
+            controllerRig.m_handRt = rController.transform;
+            controllerRig.manager = rigManager;
+
+            rigManager.tempOverrideControl = controllerRig;
+
+            lControllerObject = lController;
+            rControllerObject = rController;
+            headObject = head;
+        }
+
         [HarmonyPatch(typeof(AIBrain), "OnDeath")]
         private class AiDeathPatch
         {
             public static void Postfix(AIBrain __instance)
             {
-                if (DiscordIntegration.hasLobby)
+                if (SteamIntegration.hasLobby)
                 {
                     if (PatchVariables.shouldIgnoreNPCDeath)
                     {
@@ -267,7 +380,7 @@ namespace BonelabMultiplayerMockup.Patches
                         };
                         var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.NpcDeathPacket,
                             npcDeathData);
-                        Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, packetByteBuf.getBytes());
+                        SteamPacketNode.BroadcastMessage(NetworkChannel.Object, packetByteBuf.getBytes());
                     }
                 }
             }
@@ -278,10 +391,10 @@ namespace BonelabMultiplayerMockup.Patches
         {
             public static void Prefix(AIBrain __instance)
             {
-                if (DiscordIntegration.hasLobby)
+                if (SteamIntegration.hasLobby)
                 {
 
-                    if (DiscordIntegration.isHost)
+                    if (SteamIntegration.isHost)
                     {
                         bool isSyncedAlready = SyncedObject.isSyncedObject(__instance.gameObject);
 
@@ -306,7 +419,7 @@ namespace BonelabMultiplayerMockup.Patches
         {
             public static void Prefix(AssetPoolee __instance)
             {
-                if (DiscordIntegration.hasLobby)
+                if (SteamIntegration.hasLobby)
                 {
 
                     bool isSyncedAlready = SyncedObject.isSyncedObject(__instance.gameObject);
@@ -329,12 +442,12 @@ namespace BonelabMultiplayerMockup.Patches
         {
             public static void Postfix(AssetPoolee __instance)
             {
-                if (DiscordIntegration.hasLobby)
+                if (SteamIntegration.hasLobby)
                 {
 
                     bool isNPC = PoolManager.GetComponentOnObject<AIBrain>(__instance.gameObject) != null;
                     bool foundSpawnGun = false;
-                    bool isHost = DiscordIntegration.isHost;
+                    bool isHost = SteamIntegration.isHost;
                     if (Player.GetComponentInHand<SpawnGun>(Player.leftHand))
                     {
                         foundSpawnGun = true;
@@ -369,7 +482,7 @@ namespace BonelabMultiplayerMockup.Patches
                         return;
                     }
 
-                    if (!foundSpawnGun && !DiscordIntegration.isHost && isNPC)
+                    if (!foundSpawnGun && !SteamIntegration.isHost && isNPC)
                     {
                         DebugLogger.Msg("Didnt spawn NPC via spawn gun and is not the host of the lobby, despawning.");
                         DebugLogger.Msg("PROBABLY CAMPAIGN NPC! WAIT FOR THE HOST TO SPAWN THIS NPC IN!");
@@ -463,7 +576,7 @@ namespace BonelabMultiplayerMockup.Patches
                 };
                 PacketByteBuf packetByteBuf =
                     PacketHandler.CompressMessage(NetworkMessageType.PlayerDamagePacket, damageData);
-                Node.activeNode.SendMessage(punchedRep.user.Id, (byte)NetworkChannel.Attack, packetByteBuf.getBytes());
+                SteamPacketNode.SendMessage(punchedRep.user.Id, NetworkChannel.Attack, packetByteBuf.getBytes());
             }
         }
 
@@ -472,7 +585,7 @@ namespace BonelabMultiplayerMockup.Patches
         {
             public static void Postfix(ImpactSFX __instance, float impulse, Collision c)
             {
-                if (!DiscordIntegration.hasLobby)
+                if (!SteamIntegration.hasLobby)
                 {
                     return;
                 }
@@ -530,7 +643,7 @@ namespace BonelabMultiplayerMockup.Patches
                 };
                 PacketByteBuf packetByteBuf =
                     PacketHandler.CompressMessage(NetworkMessageType.PlayerDamagePacket, damageData);
-                Node.activeNode.SendMessage(punchedRep.user.Id, (byte)NetworkChannel.Attack, packetByteBuf.getBytes());
+                SteamPacketNode.SendMessage(punchedRep.user.Id, NetworkChannel.Attack, packetByteBuf.getBytes());
             }
         }
 
@@ -544,7 +657,7 @@ namespace BonelabMultiplayerMockup.Patches
                 float stabForce,
                 ImpactProperties surfaceProperties)
             {
-                if (!DiscordIntegration.hasLobby)
+                if (!SteamIntegration.hasLobby)
                 {
                     return;
                 }
@@ -597,7 +710,7 @@ namespace BonelabMultiplayerMockup.Patches
                 };
                 PacketByteBuf packetByteBuf =
                     PacketHandler.CompressMessage(NetworkMessageType.PlayerDamagePacket, damageData);
-                Node.activeNode.SendMessage(punchedRep.user.Id, (byte)NetworkChannel.Attack, packetByteBuf.getBytes());
+                SteamPacketNode.SendMessage(punchedRep.user.Id, NetworkChannel.Attack, packetByteBuf.getBytes());
             }
         }
 
@@ -607,7 +720,7 @@ namespace BonelabMultiplayerMockup.Patches
         {
             public static void Postfix(BalloonGun __instance)
             {
-                if (DiscordIntegration.hasLobby)
+                if (SteamIntegration.hasLobby)
                 {
                     SyncedObject gunSynced = SyncedObject.GetSyncedComponent(__instance.gameObject);
 
@@ -622,7 +735,7 @@ namespace BonelabMultiplayerMockup.Patches
                             };
                             var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.BalloonFirePacket,
                                 balloonFireData);
-                            Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, packetByteBuf.getBytes());
+                            SteamPacketNode.BroadcastMessage(NetworkChannel.Object, packetByteBuf.getBytes());
                         }
                     }
                 }
@@ -634,7 +747,7 @@ namespace BonelabMultiplayerMockup.Patches
         {
             public static void Postfix(Gun __instance)
             {
-                if (DiscordIntegration.hasLobby)
+                if (SteamIntegration.hasLobby)
                 {
                     SyncedObject gunSynced = SyncedObject.GetSyncedComponent(__instance.gameObject);
 
@@ -650,7 +763,7 @@ namespace BonelabMultiplayerMockup.Patches
                             };
                             var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.GunStatePacket,
                                 gunStateMessageData);
-                            Node.activeNode.BroadcastMessage((byte)NetworkChannel.Object, packetByteBuf.getBytes());
+                            SteamPacketNode.BroadcastMessage(NetworkChannel.Object, packetByteBuf.getBytes());
                         }
                     }
                 }
@@ -735,7 +848,7 @@ namespace BonelabMultiplayerMockup.Patches
         {
             public static void Postfix(RigManager __instance)
             {
-                if (DiscordIntegration.hasLobby)
+                if (SteamIntegration.hasLobby)
                 {
                     if (PatchVariables.shouldIgnoreAvatarSwitch)
                     {
@@ -753,7 +866,7 @@ namespace BonelabMultiplayerMockup.Patches
         {
             public static void Postfix(RigManager __instance)
             {
-                if (DiscordIntegration.hasLobby)
+                if (SteamIntegration.hasLobby)
                 {
                     if (PatchVariables.shouldIgnoreAvatarSwitch)
                     {
@@ -771,7 +884,7 @@ namespace BonelabMultiplayerMockup.Patches
         {
             public static void Postfix(Hand __instance)
             {
-                if (DiscordIntegration.hasLobby)
+                if (SteamIntegration.hasLobby)
                 {
                     if (__instance.handedness == Handedness.RIGHT)
                     {
@@ -801,7 +914,7 @@ namespace BonelabMultiplayerMockup.Patches
         {
             public static void Postfix(Hand __instance, GameObject objectToAttach)
             {
-                if (DiscordIntegration.hasLobby)
+                if (SteamIntegration.hasLobby)
                 {
                     if (Utils.Utils.IsPlayerPart(objectToAttach))
                     {

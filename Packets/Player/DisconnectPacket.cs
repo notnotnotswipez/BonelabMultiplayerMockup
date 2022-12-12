@@ -1,4 +1,5 @@
 using BonelabMultiplayerMockup.Nodes;
+using Steamworks;
 
 namespace BonelabMultiplayerMockup.Packets.Player
 {
@@ -8,7 +9,7 @@ namespace BonelabMultiplayerMockup.Packets.Player
         {
             var disconnectMessageData = (DisconnectData)messageData;
             var packetByteBuf = new PacketByteBuf();
-            packetByteBuf.WriteByte(DiscordIntegration.GetByteId(disconnectMessageData.userId));
+            packetByteBuf.WriteByte(SteamIntegration.GetByteId(disconnectMessageData.userId));
             packetByteBuf.create();
 
             return packetByteBuf;
@@ -16,14 +17,13 @@ namespace BonelabMultiplayerMockup.Packets.Player
 
         public override void ReadData(PacketByteBuf packetByteBuf, long sender)
         {
-            if (DiscordIntegration.hasLobby)
-                if (Client.instance != null)
-                    Client.instance.Shutdown();
+            if (SteamIntegration.hasLobby)
+                SteamIntegration.Disconnect(false);
         }
     }
 
     public class DisconnectData : MessageData
     {
-        public long userId;
+        public SteamId userId;
     }
 }

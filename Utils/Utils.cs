@@ -1,4 +1,5 @@
 using BonelabMultiplayerMockup.Object;
+using BonelabMultiplayerMockup.Packets;
 using BonelabMultiplayerMockup.Representations;
 using BoneLib;
 using Il2CppSystem.Reflection;
@@ -31,6 +32,16 @@ namespace BonelabMultiplayerMockup.Utils
                 prop.SetValue(dst, prop.GetValue(original, null), null);
             }
             return dst as T;
+        }
+
+        public class EmptyMessageData : MessageData
+        {
+            public EmptyMessageData(PacketByteBuf packetByteBuf)
+            {
+                internalData = packetByteBuf;
+            }
+
+            public PacketByteBuf internalData;
         }
 
         public static bool IsPlayerPart(GameObject gameObject)

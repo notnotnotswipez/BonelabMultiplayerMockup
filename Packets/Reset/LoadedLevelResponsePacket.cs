@@ -13,7 +13,7 @@ namespace BonelabMultiplayerMockup.Packets.Reset
 
         public override void ReadData(PacketByteBuf packetByteBuf, long sender)
         {
-            if (DiscordIntegration.isHost)
+            if (SteamIntegration.isHost)
             {
                 var joinCatchupData = new JoinCatchupData
                 {
@@ -21,7 +21,7 @@ namespace BonelabMultiplayerMockup.Packets.Reset
                     lastGroupId = SyncedObject.lastGroupId
                 };
                 var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.IdCatchupPacket, joinCatchupData);
-                Node.activeNode.SendMessage(sender, (byte)NetworkChannel.Reliable, catchupBuff.getBytes());
+                //SteamPacketNode.SendMessage(sender, NetworkChannel.Reliable, catchupBuff.getBytes());
             }
         }
     }

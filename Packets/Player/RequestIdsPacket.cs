@@ -1,4 +1,5 @@
 using BonelabMultiplayerMockup.Nodes;
+using Steamworks;
 
 namespace BonelabMultiplayerMockup.Packets.Player
 {
@@ -9,7 +10,7 @@ namespace BonelabMultiplayerMockup.Packets.Player
             var requestIdsMessageData = (RequestIdsData)messageData;
 
             var packetByteBuf = new PacketByteBuf();
-            packetByteBuf.WriteByte(DiscordIntegration.GetByteId(requestIdsMessageData.userId));
+            packetByteBuf.WriteByte(SteamIntegration.GetByteId(requestIdsMessageData.userId));
             packetByteBuf.create();
 
             return packetByteBuf;
@@ -17,9 +18,9 @@ namespace BonelabMultiplayerMockup.Packets.Player
 
         public override void ReadData(PacketByteBuf packetByteBuf, long sender)
         {
-            long userId = DiscordIntegration.GetByteId(packetByteBuf.ReadByte());
-            if (Server.instance != null)
-                foreach (var valuePair in DiscordIntegration.byteIds)
+            SteamId userId = SteamIntegration.GetByteId(packetByteBuf.ReadByte());
+            if (SteamIntegration.Instance.ConnectedToSteam() && SteamIntegration.isHost)
+                foreach (var valuePair in SteamIntegration.byteIds)
                 {
                     var addMessageData = new ShortIdData
                     {
@@ -28,13 +29,13 @@ namespace BonelabMultiplayerMockup.Packets.Player
                     };
                     var shortBuf =
                         PacketHandler.CompressMessage(NetworkMessageType.ShortIdUpdatePacket, addMessageData);
-                    Server.instance.SendMessage(userId, (byte)NetworkChannel.Reliable, shortBuf.getBytes());
+                    SteamPacketNode.SendMessage(userId, NetworkChannel.Reliable, shortBuf.getBytes());
                 }
         }
     }
 
     public class RequestIdsData : MessageData
     {
-        public long userId;
+        public SteamId userId;
     }
 }

@@ -5,6 +5,7 @@ using BonelabMultiplayerMockup.Object;
 using BonelabMultiplayerMockup.Packets.Player;
 using BonelabMultiplayerMockup.Patches;
 using BonelabMultiplayerMockup.Utils;
+using Steamworks;
 using UnityEngine;
 
 namespace BonelabMultiplayerMockup.Packets.Object
@@ -17,7 +18,7 @@ namespace BonelabMultiplayerMockup.Packets.Object
         {
             var initializeSyncData = (InitializeSyncData)messageData;
             var packetByteBuf = new PacketByteBuf();
-            packetByteBuf.WriteByte(DiscordIntegration.GetByteId(initializeSyncData.userId));
+            packetByteBuf.WriteByte(SteamIntegration.GetByteId(initializeSyncData.userId));
             packetByteBuf.WriteBool(initializeSyncData.checkInScene);
             packetByteBuf.WriteUShort(initializeSyncData.objectId);
             packetByteBuf.WriteUShort(initializeSyncData.finalId);
@@ -30,7 +31,7 @@ namespace BonelabMultiplayerMockup.Packets.Object
 
         public override void ReadData(PacketByteBuf packetByteBuf, long sender)
         {
-            var userId = DiscordIntegration.GetLongId(packetByteBuf.ReadByte());
+            var userId = SteamIntegration.GetLongId(packetByteBuf.ReadByte());
             var shouldCheckScene = packetByteBuf.ReadBoolean();
             var objectId = packetByteBuf.ReadUShort();
             var finalId = packetByteBuf.ReadUShort();
@@ -122,6 +123,6 @@ namespace BonelabMultiplayerMockup.Packets.Object
         public ushort objectId;
         public ushort finalId;
         public string objectName;
-        public long userId;
+        public SteamId userId;
     }
 }
