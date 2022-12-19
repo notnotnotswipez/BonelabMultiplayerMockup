@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using BonelabMultiplayerMockup.NetworkData;
 using BonelabMultiplayerMockup.Object;
 using Steamworks;
@@ -10,9 +11,12 @@ namespace BonelabMultiplayerMockup.Packets.Object
         {
             var transformUpdateData = (TransformUpdateData)messageData;
             var packetByteBuf = new PacketByteBuf();
-            packetByteBuf.WriteUShort(transformUpdateData.objectId);
-            packetByteBuf.WriteByte(SteamIntegration.GetByteId(transformUpdateData.userId));
-            packetByteBuf.WriteCompressedTransform(transformUpdateData.compressedTransform);
+            packetByteBuf.WriteByte((byte) transformUpdateData.datas.Count);
+
+            foreach (TransformObjectData transformObjectData in transformUpdateData.datas) {
+                packetByteBuf.WriteUShort(transformObjectData.objectId);
+                packetByteBuf.WriteCompressedTransform(transformObjectData.compressedTransform);
+            }
             packetByteBuf.create();
 
             return packetByteBuf;
@@ -20,21 +24,32 @@ namespace BonelabMultiplayerMockup.Packets.Object
 
         public override void ReadData(PacketByteBuf packetByteBuf, long sender)
         {
-            var objectId = packetByteBuf.ReadUShort();
-            var syncedObject = SyncedObject.GetSyncedObject(objectId);
-            if (syncedObject == null)  return;
 
-            var userId = SteamIntegration.GetLongId(packetByteBuf.ReadByte());
-            var compressedTransform = packetByteBuf.ReadCompressedTransform();
-
-            syncedObject.UpdateObject(compressedTransform);
+            var size = packetByteBuf.ReadByte();
+            
+            for (int i = 0; i < size; i++)
+            {
+                TransformObjectData transformObjectData = new TransformObjectData();
+                transformObjectData.objectId = packetByteBuf.ReadUShort();
+                transformObjectData.compressedTransform = packetByteBuf.ReadCompressedTransform();
+                transformObjectData.compressedTransform.Read();
+                
+                var syncedObject = SyncedObject.GetSyncedObject(transformObjectData.objectId);
+                if (syncedObject == null)  return;
+                
+                syncedObject.UpdateObject(transformObjectData.compressedTransform);
+            }
         }
+    }
+
+    public class TransformObjectData
+    {
+        public ushort objectId;
+        public CompressedTransform compressedTransform;
     }
 
     public class TransformUpdateData : MessageData
     {
-        public ushort objectId;
-        public CompressedTransform compressedTransform;
-        public SteamId userId;
+        public List<TransformObjectData> datas;
     }
 }

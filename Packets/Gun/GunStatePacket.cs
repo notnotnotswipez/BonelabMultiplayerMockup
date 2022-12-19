@@ -55,34 +55,37 @@ namespace BonelabMultiplayerMockup.Packets.Gun
                 if (gun != null)
                 {
                     AmmoSocket ammoSocket = PoolManager.GetComponentOnObject<AmmoSocket>(syncedObject.gameObject);
-                    if (state == 0)
+                    if (ammoSocket != null)
                     {
-                        gun.EjectCartridge();
-                        if (ammoSocket.hasMagazine)
+                        if (state == 0)
                         {
-                            ammoSocket._magazinePlug.magazine.magazineState.Refill();
-                        }
-                        else
-                        {
-                            gun.InstantLoad(); 
-                        }
-                        gun.CeaseFire();
-                        gun.Charge();
-                        gun.Fire();
-                    }
-                    else if (state == 1)
-                    {
-                        gun.Charge();
-                    }
-                    else if (state == 2)
-                    {
-                        if (gun.HasMagazine())
-                        {
-                            PoolManager.GetComponentOnObject<AmmoSocket>(gun.gameObject).EjectMagazine();
-                            if (syncedObject.storedMag != null)
+                            gun.EjectCartridge();
+                            if (ammoSocket.hasMagazine)
                             {
-                                syncedObject.storedMag.TransferGroup(syncedObject.storedMag.originalGroupId, false);
-                                syncedObject.storedMag = null;
+                                ammoSocket._magazinePlug.magazine.magazineState.Refill();
+                            }
+                            else
+                            {
+                                gun.InstantLoad(); 
+                            }
+                            gun.CeaseFire();
+                            gun.Charge();
+                            gun.Fire();
+                        }
+                        else if (state == 1)
+                        {
+                            gun.Charge();
+                        }
+                        else if (state == 2)
+                        {
+                            if (gun.HasMagazine())
+                            {
+                                PoolManager.GetComponentOnObject<AmmoSocket>(gun.gameObject).EjectMagazine();
+                                if (syncedObject.storedMag != null)
+                                {
+                                    syncedObject.storedMag.TransferGroup(syncedObject.storedMag.originalGroupId, false);
+                                    syncedObject.storedMag = null;
+                                }
                             }
                         }
                     }
