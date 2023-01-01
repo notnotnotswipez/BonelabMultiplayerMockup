@@ -27,7 +27,6 @@ namespace BonelabMultiplayerMockup.Packets.Player
             byte hand = packetByteBuf.ReadByte();
             byte colliderIndex = packetByteBuf.ReadByte();
             CompressedTransform compressedTransform = packetByteBuf.ReadCompressedTransform();
-            compressedTransform.Read();
 
             var handedness = hand == 1 ? Handedness.RIGHT : Handedness.LEFT;
             if (PlayerRepresentation.representations.ContainsKey(userId))

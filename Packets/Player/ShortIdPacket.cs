@@ -25,7 +25,7 @@ namespace BonelabMultiplayerMockup.Packets.Player
 
             if (userId == SteamIntegration.currentId)
                 SteamIntegration.localByteId = byteId;
-
+            PlayerBonePacket.hasAskedAlready = false;
             SteamIntegration.RegisterUser(byteId, userId);
         }
     }

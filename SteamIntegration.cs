@@ -21,14 +21,13 @@ namespace BonelabMultiplayerMockup
     public class SteamIntegration
     {
         public static SteamIntegration Instance;
-        public static uint gameAppId = 480;
+        public static uint gameAppId = 1592190;
 
-        public string currentName { get; set; } 
+        public string currentName { get; set; }
         public static SteamId currentId { get; set; }
+        private string playerSteamIdString;
 
         public static bool hasLobby = false;
-
-        public static ulong ownerId = 0;
 
         private string ownerIdIdentifier = "ownerId";
 
@@ -65,6 +64,7 @@ namespace BonelabMultiplayerMockup
 
             currentName = SteamClient.Name;
             currentId = SteamClient.SteamId;
+            playerSteamIdString = currentId.ToString();
             connectedToSteam = true;
             MelonLogger.Msg("Steam initialized: " + currentName);
             OpenNetworkChannels();
@@ -156,7 +156,7 @@ namespace BonelabMultiplayerMockup
 
         public void OpenNetworkChannels()
         {
-            networkChannels.Add(NetworkChannel.Unreliable, P2PSend.Unreliable);
+            networkChannels.Add(NetworkChannel.Unreliable, P2PSend.UnreliableNoDelay);
             networkChannels.Add(NetworkChannel.Reliable, P2PSend.Reliable);
             networkChannels.Add(NetworkChannel.Object, P2PSend.Reliable);
             networkChannels.Add(NetworkChannel.Attack, P2PSend.Reliable);
@@ -179,8 +179,6 @@ namespace BonelabMultiplayerMockup
             byteIds.Clear();
             userData.Clear();
             lastByteId = 0;
-            localByteId = 0;
-            BonelabMultiplayerMockup.idsReadyForPlayerInfo = new List<ulong>();
         }
 
         public bool ConnectedToSteam()
@@ -199,19 +197,13 @@ namespace BonelabMultiplayerMockup
             SteamMatchmaking.OnChatMessage += OnChatMessageCallback;
             SteamMatchmaking.OnLobbyMemberDisconnected += OnLobbyMemberDisconnectedCallback;
             SteamMatchmaking.OnLobbyMemberLeave += OnLobbyMemberLeaveCallback;
+            SteamNetworking.OnP2PSessionRequest += ((steamId) =>
+            {
+                SteamNetworking.AcceptP2PSessionWithUser(steamId);
+            });
             SteamFriends.OnGameLobbyJoinRequested += OnInviteClicked;
 
             MelonLogger.Msg("Finished registering start method.");
-        }
-
-        public async Task EstablishThenTerminateConnection()
-        {
-            var createLobbyOutput = await SteamMatchmaking.CreateLobbyAsync(10);
-            if (createLobbyOutput.HasValue)
-            {
-                currentLobby = createLobbyOutput.Value;
-                LeaveLobby();
-            }
         }
 
         public void Update()
@@ -233,9 +225,6 @@ namespace BonelabMultiplayerMockup
         {
             if (friend.Id != currentId)
             {
-                DiscordRichPresence.activity.Party.Size.CurrentSize -= 1;
-                DiscordRichPresence.UpdateActivity();
-                
                 try
                 {
                     PlayerRepresentation playerRepresentation = PlayerRepresentation.representations[friend.Id];
@@ -283,12 +272,9 @@ namespace BonelabMultiplayerMockup
             if (lobby.MemberCount !=
                 1)
             {
-                ownerId = ulong.Parse(lobby.GetData(ownerIdIdentifier));
                 hasLobby = true;
                 lobby.SendChatString("I have connected to the lobby!");
                 currentLobby = lobby;
-
-                HandlePlayerConnection(new Friend(ownerId));
         
                 foreach (var connectedFriend in currentLobby.Members)
                 {
@@ -335,19 +321,14 @@ namespace BonelabMultiplayerMockup
             // Not us, means its another player.
             if (friend.Id != currentId)
             {
-                if (isHost)
-                {
-                    MelonCoroutines.Start(WaitToSendIndexes(friend.Id));
-                }
-
-                DiscordRichPresence.activity.Party.Size.CurrentSize = 1 + DiscordRichPresence.activity.Party.Size.CurrentSize;
-                DiscordRichPresence.UpdateActivity();
-
                 MelonLogger.Msg(friend.Name+" has joined the lobby.");
                 HandlePlayerConnection(friend);
 
                 // Send byte indexing data if we are currently the host.
-                
+                if (isHost)
+                {
+                    MelonCoroutines.Start(WaitToSendIndexes(friend.Id));
+                }
             }
         }
         
@@ -362,21 +343,30 @@ namespace BonelabMultiplayerMockup
         {
             if (connectedIds.Contains(friend.Id))
                 return;
-                
+             
+            AcceptP2P(friend.Id);
             MelonLogger.Msg("Added "+friend.Name+" to connected users.");
             connectedIds.Add(friend.Id);
             
             MelonLogger.Msg("Fetched user: "+friend.Name);
-            if (!PlayerRepresentation.representations.ContainsKey(friend.Id))
-            {
-                PlayerRepresentation.representations.Add(friend.Id, new PlayerRepresentation(friend));
-            }
+            PlayerRepresentation.representations.Add(friend.Id, new PlayerRepresentation(friend));
             MelonLogger.Msg("Added representation");
             userData.Add(friend.Id, friend);
             MelonLogger.Msg("Added userdata");
-             
-            AcceptP2P(friend.Id);
             
+            
+            // This is pointless, but necessary. Its a sort of initializer packet (Dont ask me why this is the way it is.), it prevents a weird amount of lag.
+            // Has to be filled with bytes, cannot be empty.
+            PacketByteBuf byteFilled = new PacketByteBuf();
+            byteFilled.WriteByte(2);
+            byteFilled.WriteULong(23456);
+            byteFilled.WriteByte(2);
+            byteFilled.WriteULong(23456);
+            byteFilled.create();
+
+            PacketByteBuf packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.PlayerGreetingPacket,
+                new Utils.Utils.EmptyMessageData(byteFilled));
+            SteamPacketNode.SendMessage(friend.Id, NetworkChannel.Reliable, packetByteBuf.getBytes());
         }
         private void LeaveLobby()
         {
@@ -425,9 +415,7 @@ namespace BonelabMultiplayerMockup
                 }
 
                 hostedMultiplayerLobby = createLobbyOutput.Value;
-                hostedMultiplayerLobby.SetJoinable(true);
                 hostedMultiplayerLobby.SetFriendsOnly();
-                hostedMultiplayerLobby.SetData(ownerIdIdentifier, currentId.ToString());
 
                 currentLobby = hostedMultiplayerLobby;
 
@@ -451,7 +439,7 @@ namespace BonelabMultiplayerMockup
             return byteIds.FirstOrDefault(o => o.Value == longId).Key;
         }
         public static SteamId GetLongId(byte shortId) {
-            if (shortId == 0) return ownerId;
+            if (shortId == 0) return Instance.currentLobby.Owner.Id;
 
             if (byteIds.ContainsKey(shortId))
             {

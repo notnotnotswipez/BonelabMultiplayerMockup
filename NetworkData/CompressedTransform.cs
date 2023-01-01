@@ -18,6 +18,7 @@ namespace BonelabMultiplayerMockup.NetworkData
         public CompressedTransform(byte[] bytes)
         {
 	        PacketByteBuf packetByteBuf = new PacketByteBuf(bytes);
+	        Read(packetByteBuf);
 	        _packetByteBuf = packetByteBuf;
         }
 
@@ -50,12 +51,12 @@ namespace BonelabMultiplayerMockup.NetworkData
             return packetByteBuf.getBytes();
         }
 
-        public void Read()
+        public void Read(PacketByteBuf packetByteBuf)
         {
-	        position.x = _packetByteBuf.ReadFloat();
-	        position.y = _packetByteBuf.ReadFloat();
-	        position.z = _packetByteBuf.ReadFloat();
-	        rotation = ReadCompressedRotation(_packetByteBuf);
+	        position.x = packetByteBuf.ReadFloat();
+	        position.y = packetByteBuf.ReadFloat();
+	        position.z = packetByteBuf.ReadFloat();
+	        rotation = ReadCompressedRotation(packetByteBuf);
         }
         
         // https://gist.github.com/StagPoint/bb7edf61c2e97ce54e3e4561627f6582 -- Thanks for this! (Smallest 3 Compression!)
@@ -76,6 +77,13 @@ namespace BonelabMultiplayerMockup.NetworkData
 			        maxIndex = (byte)i;
 			        maxValue = abs;
 		        }
+	        }
+
+	        if (Mathf.Approximately(maxValue, 1f))
+	        {
+		        packetByteBuf.WriteByte((byte)(maxIndex + 4));
+		        packetByteBuf.create();
+		        return packetByteBuf.getBytes();
 	        }
 
 	        var a = (short)0;

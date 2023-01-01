@@ -62,6 +62,8 @@ namespace BonelabMultiplayerMockup
             {
                 Join = lobbyManager.GetLobbyActivitySecret(lobby.Id)
             };
+            
+            BonelabMultiplayerMockup.PopulateCurrentAvatarData();
 
             activity.Instance = true;
 

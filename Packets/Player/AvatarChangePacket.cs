@@ -25,12 +25,15 @@ namespace BonelabMultiplayerMockup.Packets.Player
             
             MelonLogger.Msg(userId+" sent a request to change their avatar to barcode: "+barcode);
             
-            
             if (PlayerRepresentation.representations.ContainsKey(userId))
             {
                 var playerRepresentation = PlayerRepresentation.representations[userId];
                 MelonLogger.Msg("Changing avatar on player rep");
                 playerRepresentation.SetAvatar(barcode);
+            }
+            else
+            {
+                MelonLogger.Error("Player who sent a avatar change request has NO player representation");
             }
         }
     }

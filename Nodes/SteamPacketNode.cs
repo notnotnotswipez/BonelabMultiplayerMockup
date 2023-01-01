@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using BonelabMultiplayerMockup.Packets;
 using MelonLoader;
-using SLZ.Marrow.SceneStreaming;
 using Steamworks;
 
 namespace BonelabMultiplayerMockup.Nodes
@@ -32,25 +31,9 @@ namespace BonelabMultiplayerMockup.Nodes
             }
         }
 
-        public static void BroadcastMessageToSetGroup(NetworkChannel channel, byte[] packetByteBuf, List<ulong> restOfIds)
-        {
-            foreach (var connectedUser in restOfIds)
-            {
-                if (connectedUser == SteamIntegration.currentId) continue;
-                queuedBufs.Enqueue(new QueuedPacket()
-                {
-                    _packetByteBuf = new PacketByteBuf(packetByteBuf),
-                    _steamId = connectedUser,
-                    channel = channel
-                });
-            }
-        }
-
         public static void SendMessage(SteamId steamId, NetworkChannel channel, byte[] packetByteBuf)
         {
             if (steamId == SteamIntegration.currentId) return;
-            if (SceneStreamer._session.Status == StreamStatus.LOADING) return;
-            
             queuedBufs.Enqueue(new QueuedPacket()
             {
                 _packetByteBuf = new PacketByteBuf(packetByteBuf),
@@ -66,8 +49,6 @@ namespace BonelabMultiplayerMockup.Nodes
             {
                 QueuedReceived packets;
                 while (!cachedUnreliable.TryDequeue(out packets)) continue;
-                if (packets == null) continue;
-                if (SceneStreamer._session.Status == StreamStatus.LOADING) continue;
                 try
                 {
                     PacketHandler.ReadMessage((NetworkMessageType)packets.networkMessageType, packets.packetByteBuf,
@@ -83,7 +64,6 @@ namespace BonelabMultiplayerMockup.Nodes
             {
                 QueuedReceived packets;
                 while (!receivedPackets.TryDequeue(out packets)) continue;
-                if (packets == null) continue;
                 try
                 {
                     PacketHandler.ReadMessage((NetworkMessageType)packets.networkMessageType, packets.packetByteBuf,
