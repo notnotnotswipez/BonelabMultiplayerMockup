@@ -74,20 +74,7 @@ namespace BonelabMultiplayerMockup.Representations
             //BonelabMultiplayerMockup.pauseNetworkingThread = true;
             try
             {
-                MelonLogger.Msg("Setting avatar for: "+username+" to: "+barcode);
-                if (currentBarcode == barcode)
-                {
-                    if (playerRep != null)
-                    {
-                        if (playerRep.activeInHierarchy)
-                        {
-                            //BonelabMultiplayerMockup.pauseNetworkingThread = false;
-                            return;
-                        }
-                    }
-                }
-                
-                MelonLogger.Msg("Request was different than stored.");
+                MelonLogger.Msg("Setting avatar for: "+username+" to: "+barcode);   
                 currentBarcode = barcode;
                 currentBoneId = 0;
                 currentColliderId = 0;
@@ -113,7 +100,7 @@ namespace BonelabMultiplayerMockup.Representations
                 }
                 catch (Exception e)
                 {
-                    throw;
+                    MelonLoader.Msg("somethiiiing in the wayyyyyyyyyyyy")
                 }
                 
             }
