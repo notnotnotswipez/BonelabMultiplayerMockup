@@ -35,8 +35,8 @@ namespace BonelabMultiplayerMockup.Representations
 {
     public class PlayerRepresentation
     {
-        public static Dictionary<SteamId, PlayerRepresentation> representations =
-            new Dictionary<SteamId, PlayerRepresentation>();
+        public static Dictionary<ulong, PlayerRepresentation> representations =
+            new Dictionary<ulong, PlayerRepresentation>();
         
         public Dictionary<byte, InterpolatedObject> boneDictionary = new Dictionary<byte, InterpolatedObject>();
         public Dictionary<byte, InterpolatedObject> colliderDictionary = new Dictionary<byte, InterpolatedObject>();
@@ -60,25 +60,19 @@ namespace BonelabMultiplayerMockup.Representations
         public FixedJoint lHandJoint;
 
         private static HandPose softGrab;
-        private static List<AudioClip> sounds = new List<AudioClip>();
         private static ImpactProperties _impactProperties;
 
         public PlayerRepresentation(Friend user)
         {
             this.user = user;
             username = user.Name;
-            var avatarAskData = new AvatarQuestionData()
-            {
-                // yep
-            };
-            var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.AvatarQuestionPacket, avatarAskData);
-            SteamPacketNode.SendMessage(user.Id, NetworkChannel.Transaction, catchupBuff.getBytes());
+            MelonLogger.Msg("FULLY created player rep.");
         }
         
         public void SetAvatar(string barcode)
         {
-            MelonLogger.Msg("Setting avatar for: "+username+" to: "+barcode);
-            if (currentBarcode == barcode)
+            //BonelabMultiplayerMockup.pauseNetworkingThread = true;
+            try
             {
                 MelonLogger.Msg("Setting avatar for: "+username+" to: "+barcode);   
                 currentBarcode = barcode;
@@ -110,73 +104,128 @@ namespace BonelabMultiplayerMockup.Representations
                 }
                 
             }
-
-            boneDictionary.Clear();
-            colliderDictionary.Clear();
-            if (playerRep != null)
+            catch (Exception e)
             {
-                UnityEngine.Object.Destroy(colliders);
-                UnityEngine.Object.Destroy(playerRep);
+                throw;
             }
-
-            AssetsManager.LoadAvatar(barcode, FinalizeAvatar);
         }
 
         private IEnumerator FinalizeColliders(string originalBarcode)
         {
-            RigManager rigManager = Player.rigManager;
             PatchVariables.shouldIgnoreAvatarSwitch = true;
+            
+            RigManager rigManager = Player.rigManager;
+            MelonLogger.Msg("Switched avatar to prepare for collider storage.");
             rigManager.SwitchAvatar(GameObject.Instantiate(playerRep).GetComponent<Avatar>());
-            yield return new WaitForSecondsRealtime(1f);
-            PopulateColliderDictionary();
-            AssetsManager.LoadAvatar(originalBarcode, o =>
+            MelonLogger.Msg("Finished switching avatar.");
+            yield return new WaitForSecondsRealtime(1);
+            try
             {
-                GameObject spawned = GameObject.Instantiate(o);
-                Avatar avatar = spawned.GetComponent<Avatar>();
-                foreach (var skinnedMesh in avatar.headMeshes)
+                MelonLogger.Msg("Populating collider dictionary.");
+                PopulateColliderDictionary();
+                MelonLogger.Msg("Finished populating collider dictionary");
+                MelonLogger.Msg("Loading previous avatar...");
+                AssetsManager.LoadAvatar(originalBarcode, o =>
                 {
-                    skinnedMesh.enabled = false;
-                }
-                foreach (var skinnedMesh in avatar.hairMeshes)
-                {
-                    skinnedMesh.enabled = false;
-                }
+                    GameObject spawned = GameObject.Instantiate(o);
+                    Avatar avatar = spawned.GetComponent<Avatar>();
+                    foreach (var skinnedMesh in avatar.headMeshes)
+                    {
+                        skinnedMesh.enabled = false;
+                    }
+                    foreach (var skinnedMesh in avatar.hairMeshes)
+                    {
+                        skinnedMesh.enabled = false;
+                    }
 
-                spawned.transform.parent = rigManager.gameObject.transform;
-                rigManager.SwitchAvatar(avatar);
-            });
-            yield return new WaitForSecondsRealtime(3f);
+                    spawned.transform.parent = rigManager.gameObject.transform;
+                    rigManager.SwitchAvatar(avatar);
+                    MelonLogger.Msg("Previous avatar loaded...");
+                });
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw;
+            }
+
+            yield return new WaitForSecondsRealtime(1);
             PatchVariables.shouldIgnoreAvatarSwitch = false;
+            
+            yield return new WaitForSecondsRealtime(3);
             BonelabMultiplayerMockup.PopulateCurrentAvatarData();
+            SendAvatarConfirmation();
+            MelonLogger.Msg("Sent avatar confirmation data.");
         }
 
         private void FinalizeAvatar(GameObject go)
         {
-            string original = Player.rigManager._avatarCrate._barcode._id;
-            if (playerRep != null)
+            try
             {
-                GameObject.Destroy(colliders);
-                GameObject.Destroy(playerRep);
-                GameObject backupCopy = GameObject.Instantiate(go);
-                backupCopy.name = "(PlayerRep) " + username;
-                playerRep = backupCopy;
-                Avatar avatarAgain = backupCopy.GetComponentInChildren<Avatar>();
-                PopulateBoneDictionary(avatarAgain.gameObject.transform);
-                GameObject.DontDestroyOnLoad(playerRep);
-                MelonCoroutines.Start(FinalizeColliders(original));
-                return;
-            }
+                MelonLogger.Msg("Loaded avatar.");
+                string original = Player.rigManager._avatarCrate._barcode._id;
+                if (playerRep != null)
+                {
+                    MelonLogger.Msg("Player rep is not null.");
+                    GameObject.Destroy(colliders);
+                    GameObject.Destroy(playerRep);
+                    GameObject backupCopy = GameObject.Instantiate(go);
+                    backupCopy.name = "(PlayerRep) " + username;
+                    playerRep = backupCopy;
+                    Avatar avatarAgain = backupCopy.GetComponentInChildren<Avatar>();
+                    MelonLogger.Msg("Destroyed previous player rep and made a new one.");
+                    MelonLogger.Msg("Populating bone dictionary");
+                    PopulateBoneDictionary(avatarAgain.gameObject.transform);
+                    MelonLogger.Msg("Finished populating bone dictionary.");
+                    GameObject.DontDestroyOnLoad(playerRep);
+                    MelonLogger.Msg("Finalizing colliders.");
+                    MelonCoroutines.Start(FinalizeColliders(original));
+                    return;
+                }
 
-            GameObject copy = GameObject.Instantiate(go);
-            copy.name = "(PlayerRep) " + username;
-            playerRep = copy;
-            Avatar avatar = copy.GetComponentInChildren<Avatar>();
-            PopulateBoneDictionary(avatar.gameObject.transform);
-            GameObject.DontDestroyOnLoad(copy);
-            MelonCoroutines.Start(FinalizeColliders(original));
+                GameObject copy = GameObject.Instantiate(go);
+                copy.name = "(PlayerRep) " + username;
+                playerRep = copy;
+                Avatar avatar = copy.GetComponentInChildren<Avatar>();
+                MelonLogger.Msg("Populating bone dictionary");
+                PopulateBoneDictionary(avatar.gameObject.transform);
+                MelonLogger.Msg("Finished populating bone dictionary.");
+                GameObject.DontDestroyOnLoad(copy);
+                MelonLogger.Msg("Finalizing colliders.");
+                MelonCoroutines.Start(FinalizeColliders(original));
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw;
+            }
         }
-        
-        
+
+        // Performance...? Less unity iterations throughout the children cause we dont really need to iterate.
+        public void ParentObjectsAndSuch(GameObject parent)
+        {
+            foreach (var bone in boneDictionary.Values)
+            {
+                bone.go.transform.parent = parent.transform;
+            }
+            
+            playerRep = parent;
+        }
+
+        public void SendAvatarConfirmation()
+        {
+            AvatarConfirmationData avatarConfirmationData = new AvatarConfirmationData()
+            {
+                userId = SteamIntegration.currentId
+            };
+
+            PacketByteBuf packetByteBuf =
+                PacketHandler.CompressMessage(NetworkMessageType.AvatarConfirmationPacket, avatarConfirmationData);
+            
+            SteamPacketNode.SendMessage(user.Id, NetworkChannel.Reliable, packetByteBuf.getBytes());
+        }
+
+
 
         private void PopulateBoneDictionary(Transform parent)
         {
@@ -256,6 +305,38 @@ namespace BonelabMultiplayerMockup.Representations
                     GameObject.Destroy(rHandJoint);
                     rHandJoint = null;
                 }
+            }
+        }
+
+        public static void CacheThings()
+        {
+            if (softGrab == null)
+            {
+                HandPose[] poses = Resources.FindObjectsOfTypeAll<HandPose>();
+                foreach (var p in poses)
+                {
+                    if (p.name == "SoftGrab")
+                        softGrab = p;
+                } 
+            }
+
+            /*if (sounds.Count == 0)
+            {
+                AudioClip[] clips = Resources.FindObjectsOfTypeAll<AudioClip>();
+                sounds = new List<AudioClip>();
+                foreach (var clip in clips)
+                    if (clip.name.Contains("ImpactSoft_SwordBroad"))
+                        sounds.Add(clip);
+            }*/
+
+            if (_impactProperties == null)
+            {
+                PoolManager.SpawnGameObject("c1534c5a-3fd8-4d50-9eaf-0695466f7264", Vector3.zero, Quaternion.identity,
+                    o =>
+                    { 
+                        _impactProperties = GameObject.Instantiate(PoolManager.GetComponentOnObject<ImpactProperties>(o));
+                        GameObject.Destroy(o);
+                    });
             }
         }
 
@@ -351,15 +432,15 @@ namespace BonelabMultiplayerMockup.Representations
             impactProperties.DecalMeshObj = _impactProperties.DecalMeshObj;
             impactProperties.decalType = _impactProperties.decalType;
             
-
-            ImpactSFX sfx = gameObject.AddComponent<ImpactSFX>();
+            /*ImpactSFX sfx = gameObject.AddComponent<ImpactSFX>();
             sfx.impactSoft = sounds.ToArray();
             sfx.impactHard = sounds.ToArray();
             sfx.pitchMod = 1;
             sfx.bluntDamageMult = 1;
             sfx.minVelocity = 0.4f;
             sfx.velocityClipSplit = 4;
-            sfx.jointBreakVolume = 1;
+            sfx.jointBreakVolume = 1;*/
+            
             
             InteractableHost interactableHost = gameObject.AddComponent<InteractableHost>();
             interactableHost.HasRigidbody = true;
@@ -378,7 +459,7 @@ namespace BonelabMultiplayerMockup.Representations
             genericGrip.handleAmplifyCurve = AnimationCurve.Linear(0, 0, 1, 0);
         }
 
-        private void HandleColliderObject(GameObject gameObject, Collider collider, GenericGrip genericGripOriginal, InteractableHostManager manager)
+        private void HandleColliderObject(GameObject gameObject, Collider collider, GenericGrip genericGripOriginal)
         {
             if (softGrab == null)
             {
@@ -390,14 +471,14 @@ namespace BonelabMultiplayerMockup.Representations
                 } 
             }
 
-            if (sounds.Count == 0)
+            /*if (sounds.Count == 0)
             {
                 AudioClip[] clips = Resources.FindObjectsOfTypeAll<AudioClip>();
                 sounds = new List<AudioClip>();
                 foreach (var clip in clips)
                     if (clip.name.Contains("ImpactSoft_SwordBroad"))
                         sounds.Add(clip);
-            }
+            }*/
 
             if (_impactProperties == null)
             {
@@ -423,11 +504,12 @@ namespace BonelabMultiplayerMockup.Representations
             }
 
             GameObject colliderParent = new GameObject("allColliders");
-            InteractableHostManager manager = colliderParent.AddComponent<InteractableHostManager>();
             colliders = colliderParent;
 
             GenericGrip genericGrip = null;
             bool addedAiTarget = false;
+            
+            MelonLogger.Msg("Starting to finalize colliders.");
 
             foreach (var collider in Player.GetPhysicsRig().GetComponentsInChildren<MeshCollider>())
             {
@@ -473,7 +555,7 @@ namespace BonelabMultiplayerMockup.Representations
                 Rigidbody rigidbody = gameObject.AddComponent<Rigidbody>();
                 rigidbody.isKinematic = true;
                 
-                HandleColliderObject(gameObject, meshCollider, genericGrip, manager);
+                HandleColliderObject(gameObject, meshCollider, genericGrip);
 
                 colliderDictionary.Add(currentColliderId++, new InterpolatedObject(gameObject));
             }
@@ -514,7 +596,7 @@ namespace BonelabMultiplayerMockup.Representations
                     lHand = gameObject;
                 }
                 
-                HandleColliderObject(gameObject, boxCollider, genericGrip, manager);
+                HandleColliderObject(gameObject, boxCollider, genericGrip);
 
                 colliderDictionary.Add(currentColliderId++, new InterpolatedObject(gameObject));
             }
@@ -548,13 +630,17 @@ namespace BonelabMultiplayerMockup.Representations
                     pelvisIndex = currentColliderId;
                 }
 
-                HandleColliderObject(gameObject, capsuleCollider, genericGrip, manager);
+                HandleColliderObject(gameObject, capsuleCollider, genericGrip);
 
                 colliderDictionary.Add(currentColliderId++, new InterpolatedObject(gameObject));
             }
+            
+            MelonLogger.Msg("All colliders stored.");
 
             if (pelvis != null)
             {
+                MelonLogger.Msg("Pelvis was not null.");
+                MelonLogger.Msg("Pelvis index is: "+pelvisIndex);
                 pelvis.name = "PelvisRoot";
                 pelvis.transform.parent = playerRep.transform;
                 Rigidbody pelvisBody = pelvis.GetComponent<Rigidbody>();
@@ -573,17 +659,12 @@ namespace BonelabMultiplayerMockup.Representations
                         child.transform.parent = pelvis.transform;
                     }
                 }
+                MelonLogger.Msg("Set all children to pelvis.");
             }
-
-            foreach (InteractableHost interactableHost in colliders.GetComponentsInChildren<InteractableHost>())
-            {
-                manager.hosts.AddItem(interactableHost);
-            }
-
             colliderParent.transform.parent = playerRep.transform;
         }
 
-        public void updateIkTransform(byte boneId, CompressedTransform compressedTransform)
+        public void updateIkTransform(byte boneId, Vector3 pos, Quaternion rot)
         {
             if (playerRep == null) return;
             
@@ -597,11 +678,12 @@ namespace BonelabMultiplayerMockup.Representations
                 var selectedBone = boneDictionary[boneId];
                 if (selectedBone != null)
                 {
+                    //selectedBone.UpdateTarget(pos, rot, true);
                     if (selectedBone.go != null){
                         if (pelvis != null)
                         {
-                            Quaternion rotation = pelvis.transform.rotation.Add(compressedTransform.rotation);
-                            Vector3 position = pelvis.transform.position + compressedTransform.position;
+                            Quaternion rotation = pelvis.transform.rotation.Add(rot);
+                            Vector3 position = pelvis.transform.position + pos;
 
                             selectedBone.UpdateTarget(position, rotation, true);
                         }
@@ -622,7 +704,7 @@ namespace BonelabMultiplayerMockup.Representations
             }
         }
 
-        public void updateColliderTransform(byte colliderId, CompressedTransform compressedTransform)
+        public void updateColliderTransform(byte colliderId, Vector3 pos, Quaternion rot)
         {
             if (playerRep == null) return;
 
@@ -645,16 +727,17 @@ namespace BonelabMultiplayerMockup.Representations
                     {
                         if (simulated)
                         {
-                            pelvis.transform.rotation = compressedTransform.rotation;
+                            pelvis.transform.rotation = rot;
                             return;
                         }
                     }
-                    Quaternion rotation = pelvis.transform.rotation.Add(compressedTransform.rotation);
-                    Vector3 position = pelvis.transform.position + compressedTransform.position;
+                    Quaternion rotation = pelvis.transform.rotation.Add(rot);
+                    Vector3 position = pelvis.transform.position + pos;
                     if (colliderId == pelvisIndex)
                     {
-                        rotation = compressedTransform.rotation;
-                        position = compressedTransform.position;
+                        pelvis.transform.position = pos;
+                        pelvis.transform.rotation = rot;
+                        return;
                     }
 
                     selectedBone.UpdateTarget(position, rotation, teleport);

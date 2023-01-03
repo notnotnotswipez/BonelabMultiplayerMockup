@@ -94,15 +94,21 @@ namespace BonelabMultiplayerMockup.Object
 
             if (IsClientSimulated())
             {
+                List<TransformObjectData> transformObjectDatas = new List<TransformObjectData>();
+                
                 var compressedTransform =
                     new CompressedTransform(gameObject.transform.position,
                         Quaternion.Euler(gameObject.transform.eulerAngles));
+                
+                transformObjectDatas.Add(new TransformObjectData()
+                {
+                    objectId = currentId,
+                    compressedTransform = compressedTransform
+                });
 
                 var transformUpdateData = new TransformUpdateData
                 {
-                    objectId = currentId,
-                    userId = SteamIntegration.currentId,
-                    compressedTransform = compressedTransform
+                    datas = transformObjectDatas
                 };
 
                 var packetByteBuf =
@@ -384,21 +390,21 @@ namespace BonelabMultiplayerMockup.Object
             return syncedObjects;
         }
 
-        public void UpdatePos()
+        public TransformObjectData UpdatePos()
         {
-            if (!SteamIntegration.hasLobby) return;
+            if (!SteamIntegration.hasLobby) return null;
 
             if (_rigidbody)
             {
                 if (_rigidbody.IsSleeping())
                 {
-                    return;
+                    return null;
                 }
             }
 
             if (totalRemovedGroups.Contains(groupId))
             {
-                return;
+                return null;
             }
 
             if (SteamIntegration.currentId == firstEverOwner)
@@ -411,9 +417,10 @@ namespace BonelabMultiplayerMockup.Object
                         totalRemovedGroups.Add(groupId);
                     }
 
-                    return;
+                    return null;
                 }
             }
+
             if (IsClientSimulated())
             {
                 var shouldSendUpdate = false;
@@ -433,27 +440,19 @@ namespace BonelabMultiplayerMockup.Object
                     shouldSendUpdate = changedPositions;
                 }
 
-
-
                 if (shouldSendUpdate)
                 {
-                    var compressedTransform =
-                        new CompressedTransform(gameObject.transform.position,
-                            Quaternion.Euler(gameObject.transform.eulerAngles));
+                    TransformObjectData transformObjectData = new TransformObjectData();
 
-                    var transformUpdateData = new TransformUpdateData
-                    {
-                        objectId = currentId,
-                        userId = SteamIntegration.currentId,
-                        compressedTransform = compressedTransform
-                    };
+                    transformObjectData.objectId = currentId;
+                    transformObjectData.compressedTransform = new CompressedTransform(gameObject.transform.position,
+                        Quaternion.Euler(gameObject.transform.eulerAngles));
 
-                    var packetByteBuf =
-                        PacketHandler.CompressMessage(NetworkMessageType.TransformUpdatePacket, transformUpdateData);
-                    SteamPacketNode.BroadcastMessage(NetworkChannel.Unreliable, packetByteBuf.getBytes()); 
+                    return transformObjectData;
                 }
             }
-            UpdateStoredPositions();
+
+            return null;
         }
 
         public void BroadcastOwnerChange()
@@ -733,7 +732,7 @@ namespace BonelabMultiplayerMockup.Object
 
         public void Update()
         {
-            if (!IsClientSimulated())
+            if (!IsClientSimulated() && HasChangedPositions())
             {
                 InterpolatedObject.Lerp();
             }
@@ -881,7 +880,7 @@ namespace BonelabMultiplayerMockup.Object
             return false;
         }
 
-        protected void UpdateStoredPositions()
+        public void UpdateStoredPositions()
         {
             lastPosition = transform.position;
             lastRotation = transform.rotation;
@@ -891,7 +890,9 @@ namespace BonelabMultiplayerMockup.Object
         {
             if (isNpc)
             {
-                if (!_rigidbody.IsSleeping() && npcGroupIdsToSync.Contains(groupId))
+                bool groupIdsNear = false; //npcGroupIdsToSync.Contains(groupId);
+                groupIdsNear = true;
+                if (!_rigidbody.IsSleeping() && groupIdsNear)
                 {
                     return true;
                 }

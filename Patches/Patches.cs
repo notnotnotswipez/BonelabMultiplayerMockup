@@ -27,6 +27,7 @@ using SLZ.Rig;
 using SLZ.SFX;
 using SLZ.UI;
 using SLZ.Zones;
+using Steamworks;
 using UnityEngine;
 using UnityEngine.Events;
 using Avatar = SLZ.VRMK.Avatar;
@@ -48,7 +49,7 @@ namespace BonelabMultiplayerMockup.Patches
         public static IEnumerator WaitForAvatarSwitch()
         {
             yield return new WaitForSecondsRealtime(1f);
-
+            BonelabMultiplayerMockup.idsReadyForPlayerInfo.Clear();
             MelonLogger.Msg("Swapped avatar and sending to everyone.");
             try
             {
@@ -57,7 +58,6 @@ namespace BonelabMultiplayerMockup.Patches
                     userId = SteamIntegration.currentId,
                     barcode = Player.rigManager._avatarCrate._barcode._id
                 };
-                MelonLogger.Msg("Created ");
                 var packetByteBuf = PacketHandler.CompressMessage(NetworkMessageType.AvatarChangePacket,
                     swapAvatarMessageData);
                 SteamPacketNode.BroadcastMessage(NetworkChannel.Transaction, packetByteBuf.getBytes());
@@ -100,7 +100,7 @@ namespace BonelabMultiplayerMockup.Patches
             PacketByteBuf packetByteBuf =
                 PacketHandler.CompressMessage(NetworkMessageType.SpawnRequestPacket, spawnRequestData);
             
-            SteamPacketNode.SendMessage(SteamIntegration.Instance.currentLobby.Owner.Id, NetworkChannel.Transaction, packetByteBuf.getBytes());
+            SteamPacketNode.SendMessage(SteamIntegration.ownerId, NetworkChannel.Transaction, packetByteBuf.getBytes());
             poolee.Despawn();
             yield break;
         }
@@ -498,11 +498,11 @@ namespace BonelabMultiplayerMockup.Patches
                                 {
                                     if (isHost)
                                     {
-                                        MelonCoroutines.Start(PatchCoroutines.WaitForSpawnSync(__instance.gameObject));
+                                        object stored = MelonCoroutines.Start(PatchCoroutines.WaitForSpawnSync(__instance.gameObject));
                                     }
                                     else
                                     {
-                                        MelonCoroutines.Start(PatchCoroutines.WaitForSpawnRequest(__instance));
+                                        object stored = MelonCoroutines.Start(PatchCoroutines.WaitForSpawnRequest(__instance));
                                     }
                                 }
                             }
@@ -512,11 +512,11 @@ namespace BonelabMultiplayerMockup.Patches
                                 {
                                     if (isHost)
                                     {
-                                        MelonCoroutines.Start(PatchCoroutines.WaitForSpawnSync(__instance.gameObject));
+                                        object stored = MelonCoroutines.Start(PatchCoroutines.WaitForSpawnSync(__instance.gameObject));
                                     }
                                     else
                                     {
-                                        MelonCoroutines.Start(PatchCoroutines.WaitForSpawnRequest(__instance));
+                                        object stored = MelonCoroutines.Start(PatchCoroutines.WaitForSpawnRequest(__instance));
                                     }
                                     DebugLogger.Msg("Synced spawn gun spawned Object: " + __instance.gameObject.name);
                                 }
@@ -856,7 +856,7 @@ namespace BonelabMultiplayerMockup.Patches
                     }
 
                     DebugLogger.Msg("Swapped Avatar");
-                    MelonCoroutines.Start(PatchCoroutines.WaitForAvatarSwitch());
+                    object stored = MelonCoroutines.Start(PatchCoroutines.WaitForAvatarSwitch());
                 }
             }
         }
@@ -874,7 +874,7 @@ namespace BonelabMultiplayerMockup.Patches
                     }
 
                     DebugLogger.Msg("Switched Avatar");
-                    MelonCoroutines.Start(PatchCoroutines.WaitForAvatarSwitch());
+                    object stored = MelonCoroutines.Start(PatchCoroutines.WaitForAvatarSwitch());
                 }
             }
         }
@@ -904,7 +904,7 @@ namespace BonelabMultiplayerMockup.Patches
                         }
                     }
 
-                    MelonCoroutines.Start(PatchCoroutines.WaitForObjectDetach(__instance.handedness));
+                    object stored = MelonCoroutines.Start(PatchCoroutines.WaitForObjectDetach(__instance.handedness));
                 }
             }
         }
@@ -961,7 +961,7 @@ namespace BonelabMultiplayerMockup.Patches
                     }
 
                     DebugLogger.Msg("Grabbed: " + objectToAttach.name);
-                    MelonCoroutines.Start(
+                    object stored = MelonCoroutines.Start(
                         PatchCoroutines.WaitForAttachSync(objectToAttach, __instance.handedness, true));
                 }
             }
@@ -979,7 +979,7 @@ namespace BonelabMultiplayerMockup.Patches
             {
                 if (!(__instance.pullCoroutine != null && !__state))
                     return;
-                MelonCoroutines.Start(PatchCoroutines.WaitForAttachSync(__instance.gameObject, hand.handedness, false));
+                object stored = MelonCoroutines.Start(PatchCoroutines.WaitForAttachSync(__instance.gameObject, hand.handedness, false));
             }
         }
     }

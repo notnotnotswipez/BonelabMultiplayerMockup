@@ -38,7 +38,7 @@ namespace BonelabMultiplayerMockup
         public const string Name = "BonelabMultiplayerMockup"; // Name of the Mod.  (MUST BE SET)
         public const string Author = "notnotnotswipez"; // Author of the Mod.  (Set as null if none)
         public const string Company = null; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "7.0.0"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "7.6.0"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = null; // Download Link for the Mod.  (Set as null if none)
     }
 
@@ -50,24 +50,31 @@ namespace BonelabMultiplayerMockup
         private static byte currentBoneId = 0;
         private static byte currentColliderId = 0;
         private int updateCount = 0;
-        private int desiredFrames = 2;
-        private static float currentStall = 1;
+        private int desiredFrames = 3;
         public static string sceneName = "";
+
+        private static string packetThreadStatus = "";
+        
         public static bool waitingForSceneLoad = false;
         public long lastMsUpdate = 0;
 
-        public static bool shouldModifyControllerPos = false;
+        public static int maxBoneChunkSize = 45;
+        public static int maxTransformChunkSize = 30;
 
         public static GameObject pelvis;
         public static byte pelvisId;
         
         public static MelonPreferences_Category BLMPCategory;
         public static MelonPreferences_Entry<bool> playerMotionSmoothing;
+        public static MelonPreferences_Entry<bool> useSpacewarProxy;
+
+        public static List<ulong> idsReadyForPlayerInfo = new List<ulong>();
 
         public override void OnInitializeMelon()
         {
             BLMPCategory = MelonPreferences.CreateCategory("BLMP");
             playerMotionSmoothing = BLMPCategory.CreateEntry<bool>("playerMotionSmoothing", false);
+            useSpacewarProxy = BLMPCategory.CreateEntry<bool>("useSpaceWarProxy", false);
             CreateMenu();
         }
         
@@ -77,6 +84,32 @@ namespace BonelabMultiplayerMockup
             SubPanelElement serverManagement = mainCategory.CreateSubPanel("Server Management", Color.green);
             serverManagement.CreateFunctionElement("Start Server", Color.green, () => StartServer());
             serverManagement.CreateFunctionElement("Disconnect/Stop", Color.red, () => SteamIntegration.Disconnect(false));
+            serverManagement.CreateFunctionElement("Reset Sync IDs", Color.blue, () =>
+            {
+                if (SteamIntegration.hasLobby)
+                {
+                    if (SteamIntegration.isHost)
+                    {
+                        var syncResetData = new SyncResetData()
+                        {
+                            // empty data
+                        };
+                        PacketByteBuf packetByteBuf =
+                            PacketHandler.CompressMessage(NetworkMessageType.SyncResetPacket, syncResetData);
+                        SteamPacketNode.BroadcastMessage(NetworkChannel.Transaction, packetByteBuf.getBytes());
+                        
+                        SyncedObject.CleanData(true);
+                    }
+                }
+            });
+            
+            SubPanelElement devSection = mainCategory.CreateSubPanel("Experimental Section", Color.blue);
+            devSection.CreateFunctionElement("Clear Packet Cache", Color.yellow, () =>
+            {
+                SteamPacketNode.cachedUnreliable = new ConcurrentQueue<SteamPacketNode.QueuedReceived>();
+                SteamPacketNode.queuedBufs = new ConcurrentQueue<SteamPacketNode.QueuedPacket>();
+                SteamPacketNode.receivedPackets = new ConcurrentQueue<SteamPacketNode.QueuedReceived>();
+            });
         }
 
         public static void PopulateCurrentAvatarData()
@@ -156,8 +189,6 @@ namespace BonelabMultiplayerMockup
             }
         }
 
-
-
         private static void PopulateBoneDictionary(Transform parent)
         {
             var childCount = parent.childCount;
@@ -182,81 +213,64 @@ namespace BonelabMultiplayerMockup
         public override void OnApplicationStart()
         {
             GameSDK.LoadGameSDK();
+            if (useSpacewarProxy.Value)
+            {
+                SteamIntegration.gameAppId = 480;
+            }
+            else
+            {
+                SteamIntegration.gameAppId = 1592190;
+            }
+
             SteamIntegration.Init();
             DataDirectory.Initialize();
             PacketHandler.RegisterPackets();
             
             DiscordRichPresence.Init();
-
-            Thread thread = new Thread(ProcessPackets);
-            thread.Start();
-            
         }
 
         void ProcessPackets()
         {
-            while (true)
+            packetThreadStatus = "Started thread loop";
+
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            try
             {
-                Stopwatch stopwatch = Stopwatch.StartNew();
-                try
+                packetThreadStatus = "Starting to send packets";
+                while (SteamPacketNode.queuedBufs.Count > 0)
                 {
-                    while (SteamPacketNode.queuedBufs.Count > 0)
-                    {
-                        // Failsafe, if the game stalls, the accumulated packets goes to the thousands. This is wrong, the cache must be cleared.
-                        if (DateTime.Now.Millisecond - lastMsUpdate > 40)
-                        {
-                            SteamPacketNode.cachedUnreliable = new ConcurrentQueue<SteamPacketNode.QueuedReceived>();
-                            SteamPacketNode.queuedBufs = new ConcurrentQueue<SteamPacketNode.QueuedPacket>();
-                            break;
-                        }
-                        
-                        SteamPacketNode.QueuedPacket packets;
-                        while (!SteamPacketNode.queuedBufs.TryDequeue(out packets)) continue;
+                    packetThreadStatus = "Starting while loop to send packets";
+                    SteamPacketNode.QueuedPacket packets;
+                    while (!SteamPacketNode.queuedBufs.TryDequeue(out packets)) continue;
+                    packetThreadStatus = "Dequeued a sent packet";
 
-                        P2PSend sendType = SteamIntegration.networkChannels[packets.channel];
-                        SteamNetworking.SendP2PPacket(packets._steamId, packets._packetByteBuf.getBytes(),
-                            packets._packetByteBuf.byteIndex, (byte)packets.channel, sendType);
-                    }
+                    if (packets == null) continue;
+                    P2PSend sendType = SteamIntegration.networkChannels[packets.channel];
+                    SteamNetworking.SendP2PPacket(packets._steamId, packets._packetByteBuf.getBytes(),
+                        packets._packetByteBuf.byteIndex, (byte)packets.channel, sendType);
+                    packetThreadStatus = "Finished sending a packet.";
                 }
-                catch (Exception e)
-                {
-                    MelonLogger.Error(e.ToString());
-                }
+            }
+            catch (Exception e)
+            {
+                MelonLogger.Error(e.ToString());
+            }
 
-                stopwatch.Stop();
-                SteamPacketNode.flushMsTime = stopwatch.ElapsedMilliseconds;
+            stopwatch.Stop();
+            SteamPacketNode.flushMsTime = stopwatch.ElapsedMilliseconds;
 
-                foreach (NetworkChannel channel in SteamIntegration.reliableChannels.Keys)
+            packetThreadStatus = "Starting to receive packets";
+            foreach (NetworkChannel channel in SteamIntegration.reliableChannels.Keys)
+            {
+                packetThreadStatus = "Looping through net: " + channel;
+                while (SteamNetworking.IsP2PPacketAvailable((int)channel))
                 {
-                    while (SteamNetworking.IsP2PPacketAvailable((int)channel))
-                    {
-                        P2Packet? packet = SteamNetworking.ReadP2PPacket((int)channel);
-                        if (packet.HasValue)
-                        {
-                            byte[] data = packet.Value.Data;
-                            if (data.Length <= 0) // Idk
-                                throw new Exception("Data was invalid!");
-                            byte messageType = data[0];
-                            byte[] realData = new byte[data.Length - sizeof(byte)];
-                            for (int b = sizeof(byte); b < data.Length; b++)
-                                realData[b - sizeof(byte)] = data[b];
-                            PacketByteBuf packetByteBuf = new PacketByteBuf(realData);
-                            NetworkMessageType networkMessageType = (NetworkMessageType)messageType;
-                            SteamPacketNode.QueuedReceived queuedReceived = new SteamPacketNode.QueuedReceived()
-                            {
-                                networkMessageType = networkMessageType,
-                                packetByteBuf = packetByteBuf
-                            };
-                            SteamPacketNode.receivedPackets.Enqueue(queuedReceived);
-                        }
-                    }
-                }
-
-                while (SteamNetworking.IsP2PPacketAvailable((int)NetworkChannel.Unreliable))
-                {
-                    P2Packet? packet = SteamNetworking.ReadP2PPacket((int)NetworkChannel.Unreliable);
+                    packetThreadStatus = "Starting to read packet.";
+                    P2Packet? packet = SteamNetworking.ReadP2PPacket((int)channel);
                     if (packet.HasValue)
                     {
+                        if (SceneStreamer._session.Status == StreamStatus.LOADING) continue;
+                        packetThreadStatus = "Read packet.";
                         byte[] data = packet.Value.Data;
                         if (data.Length <= 0) // Idk
                             throw new Exception("Data was invalid!");
@@ -271,10 +285,42 @@ namespace BonelabMultiplayerMockup
                             networkMessageType = networkMessageType,
                             packetByteBuf = packetByteBuf
                         };
-                        SteamPacketNode.cachedUnreliable.Enqueue(queuedReceived);
+                        SteamPacketNode.receivedPackets.Enqueue(queuedReceived);
+                        packetThreadStatus = "Enqueued packet for processing.";
                     }
                 }
             }
+
+            packetThreadStatus = "Starting to look through unreliable channel.";
+            while (SteamNetworking.IsP2PPacketAvailable((int)NetworkChannel.Unreliable))
+            {
+                packetThreadStatus = "Looping through unreliable channel";
+                packetThreadStatus = "Starting to read packet.";
+                P2Packet? packet = SteamNetworking.ReadP2PPacket((int)NetworkChannel.Unreliable);
+                if (packet.HasValue)
+                {
+                    if (SceneStreamer._session.Status == StreamStatus.LOADING) continue;
+                    packetThreadStatus = "Read packet.";
+                    byte[] data = packet.Value.Data;
+                    if (data.Length <= 0) // Idk
+                        throw new Exception("Data was invalid!");
+                    byte messageType = data[0];
+                    byte[] realData = new byte[data.Length - sizeof(byte)];
+                    for (int b = sizeof(byte); b < data.Length; b++)
+                        realData[b - sizeof(byte)] = data[b];
+                    PacketByteBuf packetByteBuf = new PacketByteBuf(realData);
+                    NetworkMessageType networkMessageType = (NetworkMessageType)messageType;
+                    SteamPacketNode.QueuedReceived queuedReceived = new SteamPacketNode.QueuedReceived()
+                    {
+                        networkMessageType = networkMessageType,
+                        packetByteBuf = packetByteBuf
+                    };
+                    SteamPacketNode.cachedUnreliable.Enqueue(queuedReceived);
+                    packetThreadStatus = "Enqueued packet.";
+                }
+            }
+
+            packetThreadStatus = "Ended thread loop";
         }
 
         private IEnumerator WaitForSceneLoad()
@@ -314,19 +360,37 @@ namespace BonelabMultiplayerMockup
                     GameObject rigManager = Player.rigManager.gameObject;
                     if (rigManager.scene.name != BonelabMultiplayerMockup.sceneName)
                     {
+                        idsReadyForPlayerInfo.Clear();
                         DebugLogger.Msg("Cleaned data");
                         DebugLogger.Msg("Loaded scene with name: " + rigManager.scene.name);
                         SyncedObject.CleanData();
-                        PopulateCurrentAvatarData();
+                        //PopulateCurrentAvatarData();
                         BonelabMultiplayerMockup.sceneName = rigManager.scene.name;
                         MelonCoroutines.Start(PatchCoroutines.WaitForAvatarSwitch());
-                
-                        // Send packet to the lobby owner saying we loaded into the scene
-                        var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.LevelResponsePacket, new LoadedLevelResponseData());
-                        SteamPacketNode.SendMessage(SteamIntegration.Instance.currentLobby.Owner.Id, (byte)NetworkChannel.Reliable, catchupBuff.getBytes());
+
+                        if (!SteamIntegration.isHost)
+                        {
+                            // Send packet to the lobby owner saying we loaded into the scene
+                            var catchupBuff = PacketHandler.CompressMessage(NetworkMessageType.LevelResponsePacket, new LoadedLevelResponseData());
+                            SteamPacketNode.SendMessage(SteamIntegration.ownerId, (byte)NetworkChannel.Reliable, catchupBuff.getBytes());
+                        }
                     }
                 }
             }
+            
+            if (Player.rigManager != null)
+            {
+                GameObject rigManager = Player.rigManager.gameObject;
+                if (rigManager.scene.name != BonelabMultiplayerMockup.sceneName)
+                {
+                    PlayerRepresentation.CacheThings();
+                }
+            }
+        }
+
+        public async void QuicklyConnectThenDisconnectFix()
+        {
+            await SteamIntegration.Instance.EstablishThenTerminateConnection();
         }
 
         public async void StartServer()
@@ -336,6 +400,11 @@ namespace BonelabMultiplayerMockup
 
         public override void OnUpdate()
         {
+            if (DateTime.Now.Millisecond - lastMsUpdate > 20)
+            {
+                SteamPacketNode.cachedUnreliable = new ConcurrentQueue<SteamPacketNode.QueuedReceived>();
+                SteamPacketNode.queuedBufs = new ConcurrentQueue<SteamPacketNode.QueuedPacket>();
+            }
             /*if (Input.GetKey(KeyCode.J))
             {
                 foreach (var rig in Patches.Patches.rigManagerObject.GetComponentsInChildren<OpenController>())
@@ -398,9 +467,9 @@ namespace BonelabMultiplayerMockup
                 }
             }*/
             
-            DiscordRichPresence.Update();
             lastMsUpdate = DateTime.Now.Millisecond;
             SteamPacketNode.Callbacks();
+            //ThreadedCalculator.ProcessCalculated();
             if (SteamIntegration.Instance != null)
             {
                 SteamIntegration.Instance.Update();
@@ -427,6 +496,7 @@ namespace BonelabMultiplayerMockup
                 MelonLogger.Msg("User ids size: "+SteamIntegration.connectedIds.Count);
                 MelonLogger.Msg("LAST PACKET SENDING TIME TOOK: "+SteamPacketNode.flushMsTime+"ms");
                 MelonLogger.Msg("LAST PACKET RECEIVING TIME TOOK: "+SteamPacketNode.callbackMsTime+"ms");
+                MelonLogger.Msg("Thread packet state: "+packetThreadStatus);
                 MelonLogger.Msg("----------------------------------------------------------");
             }
 
@@ -468,11 +538,13 @@ namespace BonelabMultiplayerMockup
                 {
                     SendBones();
                     SendColliders();
-                    SyncedObject.UpdateSyncedNPCs();
+                    //SyncedObject.UpdateSyncedNPCs();
                 }
 
                 updateCount = 0;
             }
+            
+            DiscordRichPresence.Update();
         }
 
         public override void OnFixedUpdate()
@@ -482,17 +554,52 @@ namespace BonelabMultiplayerMockup
             {
                 if (SyncedObject.syncedObjectIds.Count > 0)
                 {
+                    List<TransformObjectData> datas = new List<TransformObjectData>();
                     foreach (SyncedObject syncedObject in SyncedObject.syncedObjectIds.Values) {
                         try
                         {
-                            syncedObject.UpdatePos();
+                            TransformObjectData transformObjectData = syncedObject.UpdatePos();
+                            syncedObject.UpdateStoredPositions();
+                            if (transformObjectData != null)
+                            {
+                                datas.Add(transformObjectData);
+                                if (datas.Count >= maxTransformChunkSize)
+                                {
+                                    TransformUpdateData transformUpdateData = new TransformUpdateData()
+                                    {
+                                        datas = new List<TransformObjectData>(datas)
+                                    };
+
+                                    PacketByteBuf packetByteBuf =
+                                        PacketHandler.CompressMessage(NetworkMessageType.TransformUpdatePacket,
+                                            transformUpdateData);
+                                    
+                                    SteamPacketNode.BroadcastMessage(NetworkChannel.Unreliable, packetByteBuf.getBytes());
+                                    
+                                    datas.Clear();
+                                }
+                            }
                         }
                         catch (Exception e)
                         {
                             // Ignore it, if something goes wrong we dont want everything in the list to break
                         }
                     }
-                    
+
+                    if (datas.Count > 0)
+                    {
+                        TransformUpdateData transformUpdateData = new TransformUpdateData()
+                        {
+                            datas = new List<TransformObjectData>(datas)
+                        };
+
+                        PacketByteBuf packetByteBuf =
+                            PacketHandler.CompressMessage(NetworkMessageType.TransformUpdatePacket,
+                                transformUpdateData);
+                                    
+                        SteamPacketNode.BroadcastMessage(NetworkChannel.Unreliable, packetByteBuf.getBytes());
+                    }
+
                     if (SyncedObject.queuedObjectsToDelete.Count > 0)
                     {
                         for (int i = 0; i < SyncedObject.queuedObjectsToDelete.Count; i++)
@@ -520,11 +627,14 @@ namespace BonelabMultiplayerMockup
                         SyncedObject.queuedObjectsToDelete.Clear();
                     }
                 }
+                
+                ProcessPackets();
             }
         }
 
         private static void SendBones()
         {
+            List<BoneCacheData> storedBoneCaches = new List<BoneCacheData>();
             for (byte i = 0; i < boneDictionary.Count; i++)
             {
                 GameObject bone = boneDictionary[i];
@@ -537,23 +647,46 @@ namespace BonelabMultiplayerMockup
                 Quaternion rotation = bone.transform.rotation.Diff(pelvis.transform.rotation);
                 Vector3 position = bone.transform.position - pelvis.transform.position;
 
-                var simplifiedTransform = new CompressedTransform(position,
+                var compressedTransform = new CompressedTransform(position,
                     rotation);
 
+                BoneCacheData boneCacheData = new BoneCacheData()
+                {
+                    boneId = i,
+                    transform = compressedTransform
+                };
+                storedBoneCaches.Add(boneCacheData);
+
+                if (storedBoneCaches.Count >= maxBoneChunkSize)
+                {
+                    PlayerBoneData playerBoneData = new PlayerBoneData()
+                    {
+                        userId = SteamIntegration.currentId,
+                        bones = new List<BoneCacheData>(storedBoneCaches)
+                    };
+                    
+                    PacketByteBuf message = PacketHandler.CompressMessage(NetworkMessageType.PlayerUpdatePacket, playerBoneData);
+                    SteamPacketNode.BroadcastMessageToSetGroup(NetworkChannel.Unreliable, message.getBytes(), idsReadyForPlayerInfo);
+                    storedBoneCaches.Clear();
+                }
+            }
+
+            if (storedBoneCaches.Count > 0)
+            {
                 PlayerBoneData playerBoneData = new PlayerBoneData()
                 {
                     userId = SteamIntegration.currentId,
-                    boneId = i,
-                    transform = simplifiedTransform
+                    bones = new List<BoneCacheData>(storedBoneCaches)
                 };
-
+                    
                 PacketByteBuf message = PacketHandler.CompressMessage(NetworkMessageType.PlayerUpdatePacket, playerBoneData);
-                SteamPacketNode.BroadcastMessage(NetworkChannel.Unreliable, message.getBytes());
+                SteamPacketNode.BroadcastMessageToSetGroup(NetworkChannel.Unreliable, message.getBytes(), idsReadyForPlayerInfo);
             }
         }
         
         private static void SendColliders()
         {
+            List<BoneCacheData> storedBoneCaches = new List<BoneCacheData>();
             for (byte i = 0; i < colliderDictionary.Count; i++)
             {
                 GameObject collider = colliderDictionary[i];
@@ -575,15 +708,37 @@ namespace BonelabMultiplayerMockup
                 var simplifiedTransform = new CompressedTransform(position,
                     rotation);
 
-                PlayerColliderData playerColliderData = new PlayerColliderData()
+                BoneCacheData boneCacheData = new BoneCacheData()
+                {
+                    boneId = i,
+                    transform = simplifiedTransform
+                };
+                storedBoneCaches.Add(boneCacheData);
+
+                if (storedBoneCaches.Count >= maxBoneChunkSize)
+                {
+                    PlayerColliderData playerBoneData = new PlayerColliderData()
+                    {
+                        userId = SteamIntegration.currentId,
+                        bones = new List<BoneCacheData>(storedBoneCaches)
+                    };
+                    
+                    PacketByteBuf message = PacketHandler.CompressMessage(NetworkMessageType.PlayerColliderPacket, playerBoneData);
+                    SteamPacketNode.BroadcastMessageToSetGroup(NetworkChannel.Unreliable, message.getBytes(), idsReadyForPlayerInfo);
+                    storedBoneCaches.Clear();
+                }
+            }
+            
+            if (storedBoneCaches.Count > 0)
+            {
+                PlayerColliderData playerBoneData = new PlayerColliderData()
                 {
                     userId = SteamIntegration.currentId,
-                    colliderIndex = i,
-                    CompressedTransform = simplifiedTransform
+                    bones = new List<BoneCacheData>(storedBoneCaches)
                 };
-
-                PacketByteBuf message = PacketHandler.CompressMessage(NetworkMessageType.PlayerColliderPacket, playerColliderData);
-                SteamPacketNode.BroadcastMessage(NetworkChannel.Unreliable, message.getBytes());
+                    
+                PacketByteBuf message = PacketHandler.CompressMessage(NetworkMessageType.PlayerColliderPacket, playerBoneData);
+                SteamPacketNode.BroadcastMessageToSetGroup(NetworkChannel.Unreliable, message.getBytes(), idsReadyForPlayerInfo);
             }
         }
     }

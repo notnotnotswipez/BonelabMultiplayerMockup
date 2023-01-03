@@ -424,6 +424,7 @@
         <Compile Include="Packets\PacketTypes.cs" />
         <Compile Include="Packets\PacketByteBuf.cs" />
         <Compile Include="Packets\Player\AvatarChangePacket.cs" />
+        <Compile Include="Packets\Player\AvatarConfirmationPacket.cs" />
         <Compile Include="Packets\Player\AvatarQuestionPacket.cs" />
         <Compile Include="Packets\Player\DisconnectPacket.cs" />
         <Compile Include="Packets\Player\IdCatchupPacket.cs" />
@@ -447,6 +448,7 @@
         <Compile Include="SteamIntegration.cs" />
         <Compile Include="Utils\AssetsManager.cs" />
         <Compile Include="Utils\Blacklist.cs" />
+        <Compile Include="Utils\ThreadedCalculator.cs" />
         <Compile Include="Utils\Utils.cs" />
         <Compile Include="Utils\DataDirectory.cs" />
         <Compile Include="Utils\DebugLogger.cs" />

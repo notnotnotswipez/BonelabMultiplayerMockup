@@ -65,6 +65,7 @@ namespace BonelabMultiplayerMockup.Packets
             {
                 var transformBytes = new List<byte>();
                 var finalIndex = byteIndex + CompressedTransform.length;
+
                 int times = 0;
                 for (var i = byteIndex; i < finalIndex; i++)
                 {
@@ -158,8 +159,11 @@ namespace BonelabMultiplayerMockup.Packets
 
         public void WriteString(string str)
         {
-            var utf8 = Encoding.UTF8.GetBytes(str);
-            foreach (var b in utf8) byteList.Add(b);
+            if (str != null)
+            {
+                var utf8 = Encoding.UTF8.GetBytes(str);
+                foreach (var b in utf8) byteList.Add(b);
+            }
         }
 
         public void WriteBool(bool boolean)

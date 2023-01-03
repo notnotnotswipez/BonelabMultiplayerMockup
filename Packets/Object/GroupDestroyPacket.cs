@@ -26,26 +26,30 @@ namespace BonelabMultiplayerMockup.Packets.Object
         {
             ushort groupId = packetByteBuf.ReadUShort();
             ushort backupObjectId = packetByteBuf.ReadUShort();
-            SyncedObject backup = SyncedObject.GetSyncedObject(backupObjectId);
 
-            if (SyncedObject.npcWithRoots.ContainsKey(groupId))
+            if (SyncedObject.cachedSpawnedObjects.ContainsKey(groupId))
             {
-                SyncedObject.npcWithRoots.Remove(groupId);
-            }
+                SyncedObject backup = SyncedObject.GetSyncedObject(backupObjectId);
 
-            GameObject gameObject = SyncedObject.cachedSpawnedObjects[groupId];
-
-            if (gameObject)
-            {
-                GameObject.Destroy(gameObject);
-                SyncedObject.cachedSpawnedObjects.Remove(groupId);
-            }
-            else
-            {
-                AssetPoolee poolee = PoolManager.GetComponentOnObject<AssetPoolee>(backup.gameObject);
-                if (poolee)
+                if (SyncedObject.npcWithRoots.ContainsKey(groupId))
                 {
-                    poolee.Despawn();
+                    SyncedObject.npcWithRoots.Remove(groupId);
+                }
+
+                GameObject gameObject = SyncedObject.cachedSpawnedObjects[groupId];
+
+                if (gameObject)
+                {
+                    GameObject.Destroy(gameObject);
+                    SyncedObject.cachedSpawnedObjects.Remove(groupId);
+                }
+                else
+                {
+                    AssetPoolee poolee = PoolManager.GetComponentOnObject<AssetPoolee>(backup.gameObject);
+                    if (poolee)
+                    {
+                        poolee.Despawn();
+                    }
                 }
             }
         }
