@@ -106,7 +106,7 @@ namespace BonelabMultiplayerMockup.Representations
                 }
                 catch (Exception e)
                 {
-                    //placeholder
+                    MelonLoader.Msg("somethiiiing in the wayyyyyyyyyyyy");
                 }
                 
             }
