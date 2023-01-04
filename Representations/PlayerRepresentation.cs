@@ -100,7 +100,7 @@ namespace BonelabMultiplayerMockup.Representations
                 }
                 catch (Exception e)
                 {
-                    MelonLoader.Msg("somethiiiing in the wayyyyyyyyyyyy");
+                    MelonLogger.Msg("Error occured while loading avatar");
                 }
                 
             }

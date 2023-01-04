@@ -11,6 +11,7 @@
         <AssemblyName>BonelabMultiplayerMockupSteamNetwork</AssemblyName>
         <FileAlignment>512</FileAlignment>
         <Deterministic>true</Deterministic>
+        <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
         <TargetFrameworkProfile />
     </PropertyGroup>
     <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
